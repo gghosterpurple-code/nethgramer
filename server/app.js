@@ -92,12 +92,12 @@ const GIFT_DEFS = [
   { id:'zombie',      name:'Zombie',      price:9999999, stock:100, limited:true  },
   { id:'facepalm',    name:'Facepalm',    price:3000,    stock:5,   limited:true  },
   { id:'medal',       name:'Medal',       price:7777,    stock:66,  limited:true  },
-  { id:'3', name:'Test Gift 1', price:10,    stock:5,     limited:true,  adminOnly:true },
-  { id:'4', name:'Test Gift 2', price:15,    stock:10,    limited:true,  adminOnly:true },
-  { id:'5',    name:'Test NFT',    price:1500,  stock:50,    limited:true,  adminOnly:true },
-  { id:'6',  name:'Test NFT 1',  price:7777,  stock:5,     limited:true,  adminOnly:true },
-  { id:'7',  name:'Shard test',  price:999,   stock:25,    limited:true,  adminOnly:true },
-  { id:'8', name:'Flower test', price:1200,  stock:25,    limited:true,  adminOnly:true },
+  { id:'test_gift_1', name:'Test Gift 1', price:10,    stock:5,     limited:true,  adminOnly:true },
+  { id:'test_gift_2', name:'Test Gift 2', price:15,    stock:10,    limited:true,  adminOnly:true },
+  { id:'test_nft',    name:'Test NFT',    price:1500,  stock:50,    limited:true,  adminOnly:true },
+  { id:'test_nft_1',  name:'Test NFT 1',  price:7777,  stock:5,     limited:true,  adminOnly:true },
+  { id:'Shard_test',  name:'Shard test',  price:999,   stock:25,    limited:true,  adminOnly:true },
+  { id:'Test_flower', name:'Flower test', price:1200,  stock:25,    limited:true,  adminOnly:true },
 ];
 
 const GIFT_PRICES = {};
