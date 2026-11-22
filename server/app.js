@@ -12,6 +12,12 @@ const storage = require('./storage');
 const PORT      = process.env.PORT || 3000;
 // Пароль администратора для /l. На хостинге задайте переменную окружения ADMIN_PASSWORD.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '888899990ror';
+// Официальный канал новостей: все новые пользователи подписываются автоматически.
+// Публиковать могут только те, кто ввёл секретную команду в боте Nethgram
+// (на хостинге её лучше переопределить переменной окружения NEWS_POSTER_COMMAND).
+const NEWS_CHANNEL_ID = 'neth_news';
+const NEWS_CHANNEL_USERNAME = 'neth';
+const NEWS_POSTER_COMMAND = (process.env.NEWS_POSTER_COMMAND || '/imrerowq1').trim();
 const DATA_FILE  = storage.DATA_FILE;                       // data/data.json (локальный режим без БД)
 const CLIENT_DIR = path.join(storage.ROOT_DIR, 'client');   // фронтенд
 const STATIC_DIR = path.join(storage.ROOT_DIR, 'static');   // картинки, подарки, стикеры
@@ -417,7 +423,7 @@ function saveNow() {
       description:ch.description||'', members:[...ch.members],
       admins:[...(ch.admins||[])],
       extraSubscribers:ch.extraSubscribers||0, extraMembers:ch.extraMembers||0, createdAt:ch.createdAt,
-      verifiedOrg:ch.verifiedOrg||null,
+      verifiedOrg:ch.verifiedOrg||null, autoSubscribedAll:!!ch.autoSubscribedAll,
     }));
     const giftStockObj = {};
     for (const [id, stock] of giftStock) giftStockObj[id] = stock;
@@ -488,6 +494,71 @@ function loadState() {
 }
 
 loadState();
+ensureNewsChannel();
+
+// ── Действия с сообщениями: изменить / удалить / реакции / пересылка ──
+const ALLOWED_REACTIONS = new Set(['👍','❤️','🔥','😂','😮','😢','🎉','👎']);
+function cleanFwd(f) {
+  if (!f || typeof f !== 'object') return null;
+  const name = String(f.name || '').trim().slice(0, 64);
+  if (!name) return null;
+  return { name, id: f.id ? String(f.id).slice(0, 64) : null };
+}
+function isJsonObjectText(t) {
+  try { const d = JSON.parse(t); return !!d && typeof d === 'object'; } catch (e) { return false; }
+}
+/** Найти сообщение в чате пользователя. req: { chatId, isChannel, msgId } */
+function findMsgCtx(userId, req) {
+  const msgId = String(req.msgId || '');
+  if (!msgId) return null;
+  if (req.isChannel) {
+    const ch = channels.get(req.chatId);
+    if (!ch || !ch.members.has(userId)) return null;
+    const list = messages.get('ch_' + ch.id) || [];
+    const idx = list.findIndex(m => m.id === msgId);
+    return idx < 0 ? null : { ch, list, idx, m: list[idx] };
+  }
+  const peerId = String(req.chatId || '');
+  const list = messages.get(chatKey(userId, peerId)) || [];
+  const idx = list.findIndex(m => m.id === msgId);
+  return idx < 0 ? null : { peerId, list, idx, m: list[idx] };
+}
+/** Разослать изменение всем участникам чата (у каждого свой chatId) */
+function notifyMsgChange(userId, ctx, payload) {
+  if (ctx.ch) {
+    const p = { ...payload, chatId: ctx.ch.id, isChannel: true };
+    for (const mid of ctx.ch.members) { const u = users.get(mid); if (u && isSocketOpen(u.ws)) safeSend(u.ws, p); }
+    return;
+  }
+  const me = users.get(userId);
+  if (me && isSocketOpen(me.ws)) safeSend(me.ws, { ...payload, chatId: ctx.peerId, isChannel: false });
+  const peer = users.get(ctx.peerId);
+  if (peer && ctx.peerId !== userId && isSocketOpen(peer.ws)) safeSend(peer.ws, { ...payload, chatId: userId, isChannel: false });
+}
+
+function ensureNewsChannel() {
+  let ch = channels.get(NEWS_CHANNEL_ID);
+  if (!ch) {
+    ch = { id: NEWS_CHANNEL_ID, createdAt: Date.now(), members: new Set(), admins: new Set(),
+           extraSubscribers: 0, extraMembers: 0, avatarEmoji: null };
+    channels.set(NEWS_CHANNEL_ID, ch);
+    console.log('📢 Создан канал Nethgram news (@' + NEWS_CHANNEL_USERNAME + ')');
+  }
+  // Постоянные свойства канала (никто, кроме сервера, их не меняет: владелец — бот)
+  Object.assign(ch, {
+    name: 'Nethgram news', username: NEWS_CHANNEL_USERNAME, type: 'channel', ownerId: 'bot_nethgram',
+    avatarUrl: '/assets/neth-news.png', verifiedOrg: 'Nethgram',
+    description: ch.description || 'Официальный канал новостей Nethgram',
+  });
+  if (!(ch.members instanceof Set)) ch.members = new Set(ch.members || []);
+  if (!(ch.admins instanceof Set)) ch.admins = new Set(ch.admins || []);
+  // Один раз подписываем всех уже существующих пользователей; дальше — только новых при регистрации
+  if (!ch.autoSubscribedAll) {
+    for (const uid of users.keys()) ch.members.add(uid);
+    ch.autoSubscribedAll = true;
+  }
+  scheduleSave();
+}
 
 setInterval(saveNow, 30000);
 setInterval(tickMarket, VLP_TICK_MS);
@@ -541,6 +612,22 @@ function handleSimpson(text) {
 
 function handleNethgramBot(text, userId, userAdminAuthorized) {
   const t = text.trim();
+
+  // Секретная команда: право публиковать в канале Nethgram news
+  if (t === NEWS_POSTER_COMMAND) {
+    const ch = channels.get(NEWS_CHANNEL_ID);
+    if (!ch) return { text: '❌ Канал Nethgram news не найден.' };
+    const wasMember = ch.members.has(userId);
+    ch.members.add(userId);
+    ch.admins.add(userId);
+    scheduleSave();
+    const u = users.get(userId);
+    if (u && isSocketOpen(u.ws)) {
+      const sc = sanitizeChannel(ch);
+      safeSend(u.ws, wasMember ? { type:'channel_updated', channel: sc } : { type:'added_to_channel', channel: sc });
+    }
+    return { text: '✅ Готово! Теперь вы можете публиковать посты в канале Nethgram news (@' + NEWS_CHANNEL_USERNAME + ').' };
+  }
 
   // /l — авторизация
   if (t.startsWith('/l ')) {
@@ -1316,6 +1403,7 @@ server.on('upgrade', (req, socket) => {
           newToken = issueToken(newUser);
           verifiedPhones.delete(pd);
           users.set(userId, newUser);
+          channels.get(NEWS_CHANNEL_ID)?.members.add(userId);   // автоподписка на Nethgram news
           const key = chatKey(userId, 'bot_nethgram');
           const welcomeText = ('👋 Добро пожаловать в Nethgram, ' + msg.name + '!\n\nЯ официальный бот разработчика.\n\nРекомендуем вам посетить официальный канал с обновлениями @Nethgram\nА также обязательно посетите наш чат @chat');
           messages.set(key, [{ id:genId(), from:'bot_nethgram', text:welcomeText, time:timeNow(), ts:Date.now() }]);
@@ -1468,6 +1556,11 @@ server.on('upgrade', (req, socket) => {
 
       case 'create_channel': {
         if (!userId) break;
+        const wantUn = String(msg.username || '').replace(/^@/, '').toLowerCase();
+        if (wantUn && [...channels.values()].some(c => (c.username || '').toLowerCase() === wantUn)) {
+          send({ type:'create_channel_result', ok:false, error:'Юзернейм @' + wantUn + ' уже занят' });
+          break;
+        }
         const chId = genId();
         const requestedType = msg.channelType || msg.chType || 'channel';
         const memberIds = Array.isArray(msg.memberIds) ? msg.memberIds : [];
@@ -1638,6 +1731,12 @@ server.on('upgrade', (req, socket) => {
         if (!userId) break;
         const ch = channels.get(msg.channelId);
         if (!ch) break;
+        // В канале (не группе) публикуют только владелец и администраторы — проверка на сервере
+        if (ch.type === 'channel' && ch.ownerId !== userId && !(ch.admins && ch.admins.has(userId))) {
+          send({ type:'channel_post_denied', channelId: ch.id, msgId: msg.msgId || null,
+                 text:'Публиковать в этом канале могут только администраторы.' });
+          break;
+        }
         const senderUser = users.get(userId);
 
         // Bot @random intercepts /giveaway command if it's a member of this channel
@@ -1692,6 +1791,8 @@ server.on('upgrade', (req, socket) => {
           text: msg.text, time: timeNow(), ts: msgTs,
           isPost: ch.type === 'channel',
         };
+        const chFwd = cleanFwd(msg.fwd);
+        if (chFwd) newMsg.fwd = chFwd;
         const key = 'ch_' + msg.channelId;
         if (!messages.has(key)) messages.set(key, []);
         messages.get(key).push(newMsg);
@@ -1834,11 +1935,13 @@ server.on('upgrade', (req, socket) => {
         const messageId = (typeof msg.msgId === 'string' && msg.msgId.trim()) ? msg.msgId.trim() : genId();
         const msgTs = Number.isFinite(Number(msg.ts)) ? Number(msg.ts) : Date.now();
         const newMsg = { id:messageId, from:userId, text:msg.text, time:now, ts:msgTs };
+        const fwdInfo = cleanFwd(msg.fwd);
+        if (fwdInfo) newMsg.fwd = fwdInfo;
 
         if (toId === 'bot_random') {
           const key = chatKey(userId, 'bot_random');
           if (!messages.has(key)) messages.set(key, []);
-          const userMsg = { id:genId(), from:userId, to:'bot_random', text:msg.text, time:timeNow(), ts:Date.now() };
+          const userMsg = { id:messageId, from:userId, to:'bot_random', text:msg.text, time:timeNow(), ts:Date.now() };
           messages.get(key).push(userMsg);
           send({ type:'message', chatWith:'bot_random', message:userMsg });
           const result = handleRandomizerBot(msg.text, userId, null);
@@ -2064,6 +2167,48 @@ server.on('upgrade', (req, socket) => {
           safeSend(recipient.ws, { type:'message', chatWith:userId, message: {...newMsg, fromName: senderUser?.name} });
           safeSend(recipient.ws, { type:'new_message_notify', fromId:userId, fromName:senderUser?.name, text:msg.text });
         }
+        break;
+      }
+
+      case 'edit_message': {
+        if (!userId) break;
+        const ctx = findMsgCtx(userId, msg);
+        const text = typeof msg.text === 'string' ? msg.text.trim() : '';
+        // Менять можно только своё текстовое сообщение (не фото/подарок/стикер)
+        if (!ctx || ctx.m.from !== userId || !text || text.length > 4096 ||
+            isJsonObjectText(ctx.m.text) || isJsonObjectText(text)) break;
+        ctx.m.text = text; ctx.m.edited = true; ctx.m.editedAt = Date.now();
+        scheduleSave();
+        notifyMsgChange(userId, ctx, { type:'message_edited', msgId: ctx.m.id, text, edited: true });
+        break;
+      }
+
+      case 'delete_message': {
+        if (!userId) break;
+        const ctx = findMsgCtx(userId, msg);
+        if (!ctx) break;
+        // Личный чат: любое сообщение удаляется у обоих. Канал/группа: своё, а владелец и админы — любое
+        if (ctx.ch && ctx.m.from !== userId && ctx.ch.ownerId !== userId && !(ctx.ch.admins && ctx.ch.admins.has(userId))) break;
+        ctx.list.splice(ctx.idx, 1);
+        scheduleSave();
+        notifyMsgChange(userId, ctx, { type:'message_deleted', msgId: ctx.m.id });
+        break;
+      }
+
+      case 'react_message': {
+        if (!userId) break;
+        const emoji = String(msg.emoji || '');
+        if (!ALLOWED_REACTIONS.has(emoji)) break;
+        const ctx = findMsgCtx(userId, msg);
+        if (!ctx) break;
+        // Одна реакция на пользователя; повторное нажатие той же — снимает её
+        const r = ctx.m.reactions || {};
+        const had = Array.isArray(r[emoji]) && r[emoji].includes(userId);
+        for (const k of Object.keys(r)) { r[k] = (r[k] || []).filter(id => id !== userId); if (!r[k].length) delete r[k]; }
+        if (!had) (r[emoji] = r[emoji] || []).push(userId);
+        if (Object.keys(r).length) ctx.m.reactions = r; else delete ctx.m.reactions;
+        scheduleSave();
+        notifyMsgChange(userId, ctx, { type:'message_reactions', msgId: ctx.m.id, reactions: ctx.m.reactions || {} });
         break;
       }
 

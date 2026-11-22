@@ -69,9 +69,13 @@ function getPool() {
   try { ({ Pool } = require('pg')); }
   catch (e) { throw new Error('Модуль "pg" не установлен. Выполни: npm install'); }
   const local = /(@|\/\/)(localhost|127\.0\.0\.1)([:\/]|$)/.test(DATABASE_URL) || /sslmode=disable/.test(DATABASE_URL) || process.env.PGSSLMODE === 'disable';
+  // sslmode из строки подключения убираем: SSL задаётся явно ниже (иначе pg пишет SECURITY WARNING в лог).
+  // Проверка сертификата включена — у Neon он настоящий (так же вела себя строка с sslmode=require).
+  const connectionString = local ? DATABASE_URL
+    : DATABASE_URL.replace(/([?&])sslmode=[^&]*(&|$)/, (m, p1, p2) => (p2 ? p1 : '')).replace(/[?&]$/, '');
   pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: local ? false : { rejectUnauthorized: false },
+    connectionString,
+    ssl: local ? false : { rejectUnauthorized: true },
     max: 4, idleTimeoutMillis: 30000, connectionTimeoutMillis: 20000, keepAlive: true,
   });
   pool.on('error', e => console.error('[db] pool error:', e.message));
@@ -82,7 +86,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /** Загрузка при старте. Возвращает объект data или null (файловый режим / пустая база без data.json). */
 async function loadAll() {
-  if (!usesDb) return null;
+  if (!usesDb) {
+    console.warn('[db] ⚠ DATABASE_URL не задан — данные сохраняются в файл ' + DATA_FILE + '.');
+    if (process.env.RENDER) console.warn('[db] ⚠ На Render файл стирается при сне/перезапуске! Добавьте DATABASE_URL в Environment.');
+    return null;
+  }
   let lastErr;
   for (let attempt = 1; attempt <= 6; attempt++) {
     try {
