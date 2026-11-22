@@ -1,0 +1,17 @@
+# Зависимости
+node_modules/
+
+# Локальные данные (на хостинге данные хранятся в PostgreSQL)
+data/*
+!data/.gitkeep
+data.json
+.env
+
+# Резервные копии — в репозиторий не нужны
+backups/
+*.bak
+
+# Логи
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

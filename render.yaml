@@ -1,0 +1,20 @@
+# Render Blueprint для Nethgram: бесплатный веб-сервис.
+# База данных — внешняя бесплатная PostgreSQL на Neon (не истекает, в отличие от бесплатной базы Render).
+# Значения DATABASE_URL и ADMIN_PASSWORD вводятся в панели Render при создании (sync: false).
+services:
+  - type: web
+    name: nethgram
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --omit=dev
+    startCommand: node server/server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
