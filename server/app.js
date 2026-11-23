@@ -64,8 +64,11 @@ const userGifts      = new Map();
 const nftCounters    = new Map();
 const fakeMembers    = new Map();
 const userStars      = new Map();
+const dailyRewards   = new Map();   // userId -> время последней ежедневной награды
+const UNLIMITED_STARS = 999999999;   // баланс-метка режима /unlimited
+const DAILY_REWARD = 500, DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const premiumUsernames = new Map();
-const premiumUsers = new Set(); // кто оформил Nethgram Premium (клиент сообщает, платёж у проекта тестовый)
+const premiumUsers = new Set(); // у кого есть Nethgram Premium (выдаёт администратор: /premium @юзернейм)
 const PROFILE_BG_IDS = new Set(['aurora','sunset','ocean','forest','candy','midnight','lava','mint','gold','rose','cosmic','carbon']);
 const giveaways = new Map();       // giveawayId -> {id, channelId, prize, winnersCount, endDateStr, endDate, creatorId, participants:Set, ended, winners, msgId}
 const nethgramAdminUsers = new Set();
@@ -402,7 +405,9 @@ function loadVelosipe(d) {
 
 // ── PERSISTENCE ──
 let saveTimer = null;
+let saveForce = true;   // есть настоящие изменения (не просто колебания курса)
 function scheduleSave() {
+  saveForce = true;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(saveNow, 2000);
 }
@@ -447,12 +452,15 @@ function saveNow() {
       fakeMembers:fakeMembersObj, userStars:userStarsObj, premiumUsernames:premiumUnObj,
       channelGifts: channelGiftsObj,
       giveaways: giveawaysObj,
+      dailyRewards: Object.fromEntries(dailyRewards),
       globalSoldOut,
       velosipe: serializeVelosipe(),
       premiumUsers: [...premiumUsers],
     };
     if (storage.usesDb) {
-      return storage.save(snapshot).catch(e => console.error('[db] Save error:', e.message));
+      const force = saveForce || shuttingDown;
+      saveForce = false;
+      return storage.save(snapshot, { force }).catch(e => { saveForce = true; console.error('[db] Save error:', e.message); });
     }
     fs.writeFileSync(DATA_FILE, JSON.stringify(snapshot, null, 0));
   } catch(e) { console.error('Save error:', e.message); }
@@ -481,6 +489,7 @@ function loadState() {
     for (const [gid, cnt] of Object.entries(data.nftCounters||{})) nftCounters.set(gid, Number(cnt));
     for (const [cid, bots] of Object.entries(data.fakeMembers||{})) fakeMembers.set(cid, bots);
     for (const [uid, bal] of Object.entries(data.userStars||{})) userStars.set(uid, Number(bal));
+    for (const [uid, ts] of Object.entries(data.dailyRewards||{})) dailyRewards.set(uid, Number(ts));
     for (const [uid, uns] of Object.entries(data.premiumUsernames||{})) premiumUsernames.set(uid, uns);
     for (const [gid, gw] of Object.entries(data.giveaways||{})) {
       giveaways.set(gid, { ...gw, participants: new Set(gw.participants||[]) });
@@ -494,15 +503,16 @@ function loadState() {
 }
 
 loadState();
+cleanStoredProfiles();
 ensureNewsChannel();
 
 // ── Действия с сообщениями: изменить / удалить / реакции / пересылка ──
 const ALLOWED_REACTIONS = new Set(['👍','❤️','🔥','😂','😮','😢','🎉','👎']);
 function cleanFwd(f) {
   if (!f || typeof f !== 'object') return null;
-  const name = String(f.name || '').trim().slice(0, 64);
+  const name = cleanText(String(f.name || '').trim(), 64);
   if (!name) return null;
-  return { name, id: f.id ? String(f.id).slice(0, 64) : null };
+  return { name, id: f.id ? String(f.id).replace(/[^\w-]/g, '').slice(0, 64) : null };
 }
 function isJsonObjectText(t) {
   try { const d = JSON.parse(t); return !!d && typeof d === 'object'; } catch (e) { return false; }
@@ -534,6 +544,102 @@ function notifyMsgChange(userId, ctx, payload) {
   if (me && isSocketOpen(me.ws)) safeSend(me.ws, { ...payload, chatId: ctx.peerId, isChannel: false });
   const peer = users.get(ctx.peerId);
   if (peer && ctx.peerId !== userId && isSocketOpen(peer.ws)) safeSend(peer.ws, { ...payload, chatId: userId, isChannel: false });
+}
+
+// ── Защита от внедрения кода: всё, что вводит пользователь и что попадает в разметку ──
+const UNSAFE_CHARS = { '&':'＆', '<':'‹', '>':'›', '"':'”', "'":'’', '`':'’', '\\':'／' };
+function cleanText(v, max) {
+  return String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
+    .replace(/[&<>"'`\\]/g, ch => UNSAFE_CHARS[ch]).slice(0, max || 256);
+}
+function cleanAvatarUrl(v) {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (/^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/i.test(t)) return t;
+  if (/^\/assets\/[\w.-]+$/.test(t)) return t;
+  if (/^https?:\/\/[^\s"'<>`\\]+$/i.test(t)) return t;
+  return null;
+}
+/** Поля запроса клиента, которые потом показываются другим людям */
+function cleanClientFields(msg) {
+  if (!msg || typeof msg !== 'object') return;
+  if (typeof msg.name === 'string') msg.name = cleanText(msg.name, 64);
+  if (typeof msg.initials === 'string') msg.initials = cleanText(msg.initials, 4);
+  if (typeof msg.description === 'string') msg.description = cleanText(msg.description, 500);
+  if (typeof msg.message === 'string') msg.message = cleanText(msg.message, 500);
+  if (typeof msg.emoji === 'string') msg.emoji = cleanText(msg.emoji, 16);
+  if (typeof msg.avatarEmoji === 'string') msg.avatarEmoji = cleanText(msg.avatarEmoji, 16);
+  if (typeof msg.username === 'string') msg.username = msg.username.replace(/[^\w@.-]/g, '').slice(0, 64);
+  if (typeof msg.msgId === 'string') msg.msgId = msg.msgId.replace(/[^\w-]/g, '').slice(0, 64);
+  if ('avatarUrl' in msg && msg.avatarUrl !== null) msg.avatarUrl = cleanAvatarUrl(msg.avatarUrl);
+}
+/** Разовая очистка того, что уже лежит в базе */
+function cleanStoredProfiles() {
+  for (const u of users.values()) {
+    if (u.name) u.name = cleanText(u.name, 64);
+    if (u.initials) u.initials = cleanText(u.initials, 4);
+    if (u.username) u.username = String(u.username).replace(/[^\w@.-]/g, '').slice(0, 64);
+    u.avatarUrl = cleanAvatarUrl(u.avatarUrl);
+  }
+  for (const ch of channels.values()) {
+    if (ch.name) ch.name = cleanText(ch.name, 64);
+    if (ch.description) ch.description = cleanText(ch.description, 500);
+    if (ch.username) ch.username = String(ch.username).replace(/[^\w@.-]/g, '').slice(0, 64);
+    if (ch.avatarEmoji) ch.avatarEmoji = cleanText(ch.avatarEmoji, 16);
+    ch.avatarUrl = cleanAvatarUrl(ch.avatarUrl);
+  }
+}
+function premiumStateMsg(uid, notify) {
+  return { type:'premium_state', active: premiumUsers.has(uid), notify: !!notify };
+}
+function findUserForAdmin(query) {
+  const q = String(query || '').replace(/^@/, '').toLowerCase();
+  if (!q) return null;
+  const digits = q.replace(/\D/g, '');
+  for (const u of users.values()) {
+    if (u.id === q || (u.username && u.username.replace(/^@/, '').toLowerCase() === q)) return u;
+    if (digits.length >= 5 && digits === q.replace(/^\+/, '') && phoneDigits(u.phone) === digits) return u;
+  }
+  return findUserByPremiumUsername(q) || null;
+}
+
+// ── Звёзды: баланс считает только сервер ──
+function starsOf(uid) { return userStars.get(uid) || 0; }
+function trySpendStars(uid, cost) {
+  const bal = starsOf(uid);
+  if (bal >= UNLIMITED_STARS) return true;
+  if (bal < cost) return false;
+  userStars.set(uid, bal - cost);
+  return true;
+}
+function starsSyncMsg(uid) {
+  return { type:'stars_sync', balance: starsOf(uid), lastDaily: dailyRewards.get(uid) || null };
+}
+/** Текст, притворяющийся подарком: такие карточки создаёт только сервер или оплаченная покупка */
+function isForgedGiftText(t) {
+  if (typeof t !== 'string' || t.charCodeAt(0) !== 123) return false;
+  try { const d = JSON.parse(t); return !!d && (d.isGift === true || d.isNftTransfer === true); } catch (e) { return false; }
+}
+
+// ── Подарки каналов и групп: управляют только владелец и админы ──
+function canManageChannelGifts(ch, uid) {
+  return !!ch && !!uid && (ch.ownerId === uid || !!(ch.admins && ch.admins.has(uid)));
+}
+function visibleChannelGifts(ch, uid) {
+  const all = (ch && channelGifts.get(ch.id)) || [];
+  return canManageChannelGifts(ch, uid) ? all : all.filter(g => !g.hidden);
+}
+/** Разослать участникам актуальный список (скрытые подарки видят только админы) */
+function syncChannelGifts(ch) {
+  for (const mid of ch.members) {
+    const u = users.get(mid);
+    if (u && isSocketOpen(u.ws)) safeSend(u.ws, { type:'channel_gifts', channelId: ch.id, gifts: visibleChannelGifts(ch, mid) });
+  }
+}
+/** Поставить подарок в список так, чтобы его ts (идентификатор) был уникальным */
+function pushGiftUnique(list, gift) {
+  while (list.some(x => String(x.ts) === String(gift.ts))) gift.ts = Number(gift.ts) + 1;
+  list.push(gift);
 }
 
 function ensureNewsChannel() {
@@ -678,6 +784,28 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
   if (t === '/unlimited' || t.startsWith('/unlimited ')) {
     if (!isAdmin) return { text: '🔒 Команда /unlimited доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
     return { text: '♾️ Режим бесконечных звёзд активирован!\n\nТеперь вы можете тратить звёзды без ограничений. Баланс всегда будет восстанавливаться автоматически.', infiniteStars: true };
+  }
+
+  // /premium @юзернейм — выдать, /unpremium @юзернейм — забрать
+  if (/^\/(un)?premium(\s|$)/.test(t)) {
+    if (!isAdmin) return { text: '🔒 Команда доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
+    const grant = /^\/premium/.test(t);
+    const arg = t.split(/\s+/)[1];
+    if (!arg) return { text: '⚠️ Использование: ' + (grant ? '/premium' : '/unpremium') + ' @юзернейм' };
+    const pu = findUserForAdmin(arg);
+    if (!pu) return { text: '❌ Пользователь ' + arg + ' не найден.' };
+    if (grant) premiumUsers.add(pu.id);
+    else {
+      premiumUsers.delete(pu.id);
+      // без подписки недоступны фон профиля и значок у имени
+      pu.profileBg = null;
+      pu.nameBadge = null;
+      broadcastAll(pu.id, { type:'user_profile_updated', userId:pu.id, name:pu.name, initials:pu.initials,
+        avatarUrl:pu.avatarUrl||null, username:pu.username||null, wornNft:pu.wornNft||null, nameBadge:null, profileBg:null });
+    }
+    scheduleSave();
+    if (isSocketOpen(pu.ws)) safeSend(pu.ws, premiumStateMsg(pu.id, true));
+    return { text: (grant ? '✅ Premium выдан: ' : '✅ Premium снят: ') + pu.name };
   }
 
   // /sub
@@ -1291,6 +1419,7 @@ server.on('upgrade', (req, socket) => {
   socket.on('error', () => {});
 
   function handleMessage(msg) {
+    cleanClientFields(msg);
     if (!userId && ['create_channel','update_name','set_username','check_username'].includes(msg.type)) {
       send({ type:'session_lost' });
       return;
@@ -1438,7 +1567,8 @@ server.on('upgrade', (req, socket) => {
         const myGifts = userGifts.get(userId) || [];
         send({ type:'user_gifts', userId, gifts: myGifts });
         // Stars
-        if (userStars.has(userId)) send({ type:'stars_sync', balance: userStars.get(userId) });
+        send(starsSyncMsg(userId));
+        send(premiumStateMsg(userId));
         // Premium usernames
         if (premiumUsernames.has(userId)) send({ type:'premium_usernames_list', usernames: premiumUsernames.get(userId) });
         // globalSoldOut
@@ -1737,6 +1867,7 @@ server.on('upgrade', (req, socket) => {
                  text:'Публиковать в этом канале могут только администраторы.' });
           break;
         }
+        if (isForgedGiftText(msg.text)) break;
         const senderUser = users.get(userId);
 
         // Bot @random intercepts /giveaway command if it's a member of this channel
@@ -1938,6 +2069,30 @@ server.on('upgrade', (req, socket) => {
         const fwdInfo = cleanFwd(msg.fwd);
         if (fwdInfo) newMsg.fwd = fwdInfo;
 
+        if (msg.isGift) {
+          // Цену, название и наличие определяет сервер; звёзды списываются до доставки
+          let gReq = null;
+          try { gReq = JSON.parse(msg.text); } catch (e) {}
+          const gDef = gReq && gReq.isGift === true ? GIFT_DEFS.find(g => g.id === gReq.giftId) : null;
+          const giftFail = text => send({ ...starsSyncMsg(userId), type:'gift_failed', msgId:messageId, toId, text, refund: gDef ? gDef.price : 0 });
+          if (!gDef) { giftFail('Подарок не найден'); break; }
+          if (!users.has(toId)) { giftFail('Получатель не найден'); break; }
+          const isBotAdmin = nethgramAdminUsers.has(userId);
+          if (gDef.adminOnly && !isBotAdmin) { giftFail('Этот подарок недоступен'); break; }
+          if (globalSoldOut && !isBotAdmin) { giftFail('Магазин временно закрыт'); break; }
+          const gStock = giftStock.get(gDef.id);
+          if (gStock !== null && gStock !== undefined && gStock <= 0) { giftFail('Подарок распродан!'); break; }
+          if (!trySpendStars(userId, gDef.price)) { giftFail('Недостаточно звёзд'); break; }
+          gReq.giftName = gDef.name;
+          gReq.giftPrice = gDef.price;
+          gReq.fromName = senderUser?.name || 'Пользователь';
+          gReq.message = String(gReq.message || '').slice(0, 500);
+          newMsg.text = JSON.stringify(gReq);
+          send(starsSyncMsg(userId));
+        } else if (isForgedGiftText(msg.text)) {
+          break;
+        }
+
         if (toId === 'bot_random') {
           const key = chatKey(userId, 'bot_random');
           if (!messages.has(key)) messages.set(key, []);
@@ -1991,6 +2146,8 @@ server.on('upgrade', (req, socket) => {
               scheduleSave();
             }
             if (result.infiniteStars) {
+              userStars.set(userId, UNLIMITED_STARS);
+              scheduleSave();
               send({ type:'stars_infinite' });
             }
             if (result.giveStars) {
@@ -2143,7 +2300,7 @@ server.on('upgrade', (req, socket) => {
               msg: gData.message || '', ts: newMsg.ts,
             };
             if (!userGifts.has(toId)) userGifts.set(toId, []);
-            userGifts.get(toId).push(entry);
+            pushGiftUnique(userGifts.get(toId), entry);
             scheduleSave();
 
             // Realtime update for gifts/profile state
@@ -2240,6 +2397,19 @@ server.on('upgrade', (req, socket) => {
 
       case 'toggle_gift_hidden': {
         if (!userId) break;
+        if (msg.channelId) {
+          const hCh = channels.get(msg.channelId);
+          if (!canManageChannelGifts(hCh, userId)) {
+            send({ type:'channel_gift_failed', text:'Это могут только админы канала или группы' });
+            break;
+          }
+          const hg = (channelGifts.get(hCh.id) || []).find(g => String(g.ts) === String(msg.giftTs));
+          if (!hg) break;
+          hg.hidden = !!msg.hidden;
+          scheduleSave();
+          syncChannelGifts(hCh);
+          break;
+        }
         const own = userGifts.get(userId) || [];
         const gi = own.find(g => String(g.ts) === String(msg.giftTs));
         if (!gi) break;
@@ -2250,19 +2420,18 @@ server.on('upgrade', (req, socket) => {
 
       case 'upgrade_to_nft': {
         if (!userId) break;
-        const gifts = userGifts.get(userId) || [];
+        const upCh = msg.channelId ? channels.get(msg.channelId) : null;
+        const upFail = text => send({ type:'channel_gift_failed', text, balance: starsOf(userId) });
+        if (msg.channelId && !canManageChannelGifts(upCh, userId)) { upFail('Улучшать подарки могут только админы канала или группы'); break; }
+        const gifts = upCh ? (channelGifts.get(upCh.id) || []) : (userGifts.get(userId) || []);
         const idx = gifts.findIndex(g => g.ts == msg.giftTs && !g.isNft);
-        if (idx === -1) { send({ type:'error', text:'Подарок не найден' }); break; }
+        if (idx === -1) { upFail('Подарок не найден'); break; }
         const g = gifts[idx];
-        // Deduct stars
+        if (upCh && !NFT_MODELS_BY_GIFT[g.giftId]) { upFail('Этот подарок нельзя улучшить'); break; }
+        // Deduct stars (при улучшении подарка канала платит админ, который нажал кнопку)
         const upgradeCost = Math.ceil((g.giftPrice || 0) * 0.15);
-        const curStars = userStars.get(userId) || 0;
-        if (curStars < upgradeCost) {
-          send({ type:'error', text:'Недостаточно звёзд для улучшения!' });
-          send({ type:'stars_refund', amount: upgradeCost });
-          break;
-        }
-        userStars.set(userId, curStars - upgradeCost);
+        if (!trySpendStars(userId, upgradeCost)) { upFail('Недостаточно звёзд для улучшения!'); break; }
+        send(starsSyncMsg(userId));
         // Deduct stock
         if (giftStock.has(g.giftId)) {
           const curStock = giftStock.get(g.giftId);
@@ -2279,62 +2448,107 @@ server.on('upgrade', (req, socket) => {
           ...g, isNft:true, nftModel:model.id, nftModelName:model.name,
           nftGradient:gradient.css, nftGradientName:gradient.name,
           nftSerial:'NFT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,6).toUpperCase(),
-          nftNumber, nftTag:'#' + tagBase + nftNumber, nftOwnerId:userId, nftTs:Date.now(),
+          nftNumber, nftTag:'#' + tagBase + nftNumber, nftOwnerId: upCh ? upCh.id : userId, nftOwnerChannel: !!upCh, nftTs:Date.now(),
         };
         scheduleSave();
-        send({ type:'nft_upgraded', gift:gifts[idx] });
+        if (upCh) {
+          syncChannelGifts(upCh);
+          send({ type:'channel_nft_upgraded', channelId: upCh.id, gift: gifts[idx] });
+        } else {
+          send({ type:'nft_upgraded', gift:gifts[idx] });
+        }
         break;
       }
 
       case 'transfer_nft': {
         if (!userId) break;
-        const fromGifts = userGifts.get(userId) || [];
-        const nftIdx = fromGifts.findIndex(g => String(g.ts) === String(msg.giftTs) && g.isNft);
-        if (nftIdx === -1) { send({ type:'error', text:'NFT не найден или вы не владелец' }); break; }
-        const targetUser = users.get(msg.toUserId);
-        if (!targetUser || msg.toUserId === userId) { send({ type:'error', text:'Пользователь не найден' }); break; }
+        const fromCh = msg.fromChannelId ? channels.get(msg.fromChannelId) : null;
+        const tFail = text => msg.fromChannelId ? send({ type:'channel_gift_failed', text }) : send({ type:'error', text });
+        if (msg.fromChannelId && !canManageChannelGifts(fromCh, userId)) { tFail('Передавать NFT могут только админы канала или группы'); break; }
+        const srcGifts = fromCh ? (channelGifts.get(fromCh.id) || []) : (userGifts.get(userId) || []);
+        const nftIdx = srcGifts.findIndex(g => String(g.ts) === String(msg.giftTs) && g.isNft);
+        if (nftIdx === -1) { tFail('NFT не найден или вы не владелец'); break; }
+
+        // Получатель: канал/группа (нужно быть участником) или пользователь
+        const toCh = msg.toChannelId ? channels.get(msg.toChannelId) : null;
+        if (msg.toChannelId && (!toCh || !toCh.members.has(userId))) { tFail('Канал или группа не найдены'); break; }
+        if (toCh && fromCh && toCh.id === fromCh.id) { tFail('NFT уже находится в этом канале'); break; }
+        const targetUser = toCh ? null : users.get(msg.toUserId);
+        if (!toCh && (!targetUser || (!fromCh && msg.toUserId === userId))) { tFail('Пользователь не найден'); break; }
+
         const fromUser = users.get(userId);
-        const nft = { ...fromGifts[nftIdx], nftOwnerId:msg.toUserId, nftTransferredFrom:userId, nftTransferTs:Date.now() };
-        fromGifts.splice(nftIdx, 1);
-        userGifts.set(userId, fromGifts);
-        if (!userGifts.has(msg.toUserId)) userGifts.set(msg.toUserId, []);
-        userGifts.get(msg.toUserId).push(nft);
+        const srcName = fromCh ? fromCh.name : (fromUser?.name || 'Пользователь');
+        const toId = toCh ? toCh.id : msg.toUserId;
+        const nft = { ...srcGifts[nftIdx], nftOwnerId:toId, nftOwnerChannel:!!toCh,
+                      nftTransferredFrom: fromCh ? fromCh.id : userId, nftTransferTs:Date.now(), hidden:false };
+        const oldTs = nft.ts;
+        srcGifts.splice(nftIdx, 1);
+
         // если NFT был надет у отправителя — снимаем
-        if (fromUser && fromUser.wornNft && String(fromUser.wornNft.ts) === String(nft.ts)) {
+        if (!fromCh && fromUser && fromUser.wornNft && String(fromUser.wornNft.ts) === String(oldTs)) {
           fromUser.wornNft = null;
           broadcastAll(userId, { type:'user_profile_updated', userId, name:fromUser.name, initials:fromUser.initials,
             avatarUrl:fromUser.avatarUrl||null, username:fromUser.username||null, wornNft:null, nameBadge:fromUser.nameBadge||null });
         }
-        // сообщение о передаче в чате
-        const tData = { isNftTransfer:true, giftId:nft.giftId, giftName:nft.giftName, giftPrice:nft.giftPrice,
-          nftTs:nft.ts, nftTag:nft.nftTag, nftNumber:nft.nftNumber, nftSerial:nft.nftSerial, nftModel:nft.nftModel,
-          nftModelName:nft.nftModelName, nftGradient:nft.nftGradient, nftGradientName:nft.nftGradientName,
-          fromId:userId, fromName:fromUser?.name || 'Пользователь', toId:msg.toUserId, toName:targetUser.name };
-        const tMsg = { id:genId(), from:userId, text:JSON.stringify(tData), time:timeNow(), ts:Date.now() };
-        const tKey = chatKey(userId, msg.toUserId);
-        if (!messages.has(tKey)) messages.set(tKey, []);
-        messages.get(tKey).push(tMsg);
+
+        if (toCh) {
+          nft.fromId = userId; nft.fromName = srcName;
+          if (!channelGifts.has(toCh.id)) channelGifts.set(toCh.id, []);
+          pushGiftUnique(channelGifts.get(toCh.id), nft);
+          for (const mid of toCh.members) {
+            const u = users.get(mid);
+            if (u && isSocketOpen(u.ws)) safeSend(u.ws, { type:'channel_gift_received', channelId: toCh.id, gift: nft });
+          }
+        } else {
+          if (!userGifts.has(toId)) userGifts.set(toId, []);
+          pushGiftUnique(userGifts.get(toId), nft);
+          // сообщение о передаче в чате (кроме случая, когда админ забирает NFT канала себе)
+          if (toId !== userId) {
+            const tData = { isNftTransfer:true, giftId:nft.giftId, giftName:nft.giftName, giftPrice:nft.giftPrice,
+              nftTs:nft.ts, nftTag:nft.nftTag, nftNumber:nft.nftNumber, nftSerial:nft.nftSerial, nftModel:nft.nftModel,
+              nftModelName:nft.nftModelName, nftGradient:nft.nftGradient, nftGradientName:nft.nftGradientName,
+              fromId:userId, fromName:srcName, toId, toName:targetUser.name };
+            const tMsg = { id:genId(), from:userId, text:JSON.stringify(tData), time:timeNow(), ts:Date.now() };
+            const tKey = chatKey(userId, toId);
+            if (!messages.has(tKey)) messages.set(tKey, []);
+            messages.get(tKey).push(tMsg);
+            send({ type:'message', chatWith:toId, message:tMsg });
+            if (isSocketOpen(targetUser.ws)) {
+              safeSend(targetUser.ws, { type:'message', chatWith:userId, message:{ ...tMsg, fromName:fromUser?.name } });
+              safeSend(targetUser.ws, { type:'new_message_notify', fromId:userId, fromName:fromUser?.name, text:'🎁 ' + (nft.giftName || 'NFT-подарок') });
+            }
+          }
+          if (isSocketOpen(targetUser.ws)) safeSend(targetUser.ws, { type:'nft_received', nft });
+        }
         scheduleSave();
-        send({ type:'nft_transferred', toUserId:msg.toUserId, giftTs:nft.ts, nft });
-        send({ type:'message', chatWith:msg.toUserId, message:tMsg });
-        if (isSocketOpen(targetUser.ws)) {
-          safeSend(targetUser.ws, { type:'nft_received', nft });
-          safeSend(targetUser.ws, { type:'message', chatWith:userId, message:{ ...tMsg, fromName:fromUser?.name } });
-          safeSend(targetUser.ws, { type:'new_message_notify', fromId:userId, fromName:fromUser?.name, text:'🎁 ' + (nft.giftName || 'NFT-подарок') });
+
+        if (fromCh) {
+          syncChannelGifts(fromCh);
+          send({ type:'channel_nft_transferred', channelId: fromCh.id, toName: toCh ? toCh.name : targetUser.name });
+        } else {
+          send({ type:'nft_transferred', toUserId: toCh ? null : toId, toChannelId: toCh ? toCh.id : null, giftTs: oldTs, nft });
         }
         break;
       }
 
-      case 'sync_stars': {
+      case 'claim_daily': {
         if (!userId) break;
-        const clientBal = parseInt(msg.balance) || 0;
-        if (clientBal >= 0) { userStars.set(userId, clientBal); scheduleSave(); }
+        const lastClaim = dailyRewards.get(userId) || 0;
+        if (Date.now() - lastClaim < DAILY_COOLDOWN_MS) { send({ ...starsSyncMsg(userId), denied:true }); break; }
+        dailyRewards.set(userId, Date.now());
+        if (starsOf(userId) < UNLIMITED_STARS) userStars.set(userId, starsOf(userId) + DAILY_REWARD);
+        scheduleSave();
+        send({ type:'daily_ok', amount: DAILY_REWARD, balance: starsOf(userId), lastDaily: dailyRewards.get(userId) });
         break;
       }
 
       case 'set_name_badge': {
         if (!userId) break;
         const u = users.get(userId);
+        if (msg.nameBadge && !premiumUsers.has(userId)) {
+          send({ ...premiumStateMsg(userId), denied:true });
+          break;
+        }
         if (u) {
           u.nameBadge = msg.nameBadge || null;
           scheduleSave();
@@ -2366,13 +2580,6 @@ server.on('upgrade', (req, socket) => {
             nameBadge: u.nameBadge||null,
           });
         }
-        break;
-      }
-
-      case 'sync_premium': {
-        // клиент сообщает, что подписка Premium активна (оплата в проекте тестовая)
-        if (!userId) break;
-        if (msg.active === true && !premiumUsers.has(userId)) { premiumUsers.add(userId); scheduleSave(); }
         break;
       }
 
@@ -2453,26 +2660,24 @@ server.on('upgrade', (req, socket) => {
       // ── CHANNEL GIFTS ──
       case 'send_channel_gift': {
         if (!userId) break;
-        const ch = channels.get(msg.channelId);
-        if (!ch) { send({ type:'error', text:'Канал не найден' }); break; }
-        if (!ch.members.has(userId)) { send({ type:'error', text:'Вы не участник этого канала' }); break; }
-
         const giftId = msg.giftId;
         const giftDef = GIFT_DEFS.find(g => g.id === giftId);
-        if (!giftDef) { send({ type:'error', text:'Подарок не найден' }); break; }
-
-        // Check and deduct stock
-        if (globalSoldOut && !nethgramAdminUsers.has(userId)) {
-          send({ type:'error', text:'Магазин временно закрыт' }); break;
-        }
+        const chFail = text => send({ ...starsSyncMsg(userId), type:'gift_failed', text, refund: giftDef ? giftDef.price : 0 });
+        const ch = channels.get(msg.channelId);
+        if (!ch) { chFail('Канал не найден'); break; }
+        if (!ch.members.has(userId)) { chFail('Вы не участник этого канала'); break; }
+        if (!giftDef) { chFail('Подарок не найден'); break; }
+        const isBotAdmin = nethgramAdminUsers.has(userId);
+        if (giftDef.adminOnly && !isBotAdmin) { chFail('Этот подарок недоступен'); break; }
+        if (globalSoldOut && !isBotAdmin) { chFail('Магазин временно закрыт'); break; }
         const curStock = giftStock.get(giftId);
-        if (curStock !== null && curStock !== undefined && curStock <= 0) {
-          send({ type:'error', text:'Подарок распродан!' }); break;
-        }
+        if (curStock !== null && curStock !== undefined && curStock <= 0) { chFail('Подарок распродан!'); break; }
+        if (!trySpendStars(userId, giftDef.price)) { chFail('Недостаточно звёзд'); break; }
         if (curStock !== null && curStock !== undefined) {
           giftStock.set(giftId, curStock - 1);
           send({ type:'stock_update', giftId, stock: curStock - 1 });
         }
+        send(starsSyncMsg(userId));
 
         const senderUser = users.get(userId);
         const entry = {
@@ -2481,12 +2686,12 @@ server.on('upgrade', (req, socket) => {
           giftPrice: giftDef.price,
           fromId: userId,
           fromName: senderUser?.name || 'Пользователь',
-          message: msg.message || '',
+          message: String(msg.message || '').slice(0, 500),
           ts: Date.now(),
         };
 
         if (!channelGifts.has(msg.channelId)) channelGifts.set(msg.channelId, []);
-        channelGifts.get(msg.channelId).push(entry);
+        pushGiftUnique(channelGifts.get(msg.channelId), entry);
         scheduleSave();
 
         // Notify all channel members
@@ -2499,8 +2704,8 @@ server.on('upgrade', (req, socket) => {
       }
 
       case 'get_channel_gifts': {
-        const gifts = channelGifts.get(msg.channelId) || [];
-        send({ type:'channel_gifts', channelId: msg.channelId, gifts });
+        const giftsCh = channels.get(msg.channelId);
+        send({ type:'channel_gifts', channelId: msg.channelId, gifts: visibleChannelGifts(giftsCh, userId) });
         break;
       }
 
@@ -2535,7 +2740,7 @@ server.on('upgrade', (req, socket) => {
         const cost = Math.ceil(n * velosipe.rate - 1e-9);
         const stars = userStars.get(userId) || 0;
         if (stars < cost) { send({ type:'velosipe_error', text:`Недостаточно звёзд: нужно ${cost.toLocaleString('ru-RU')} ⭐` }); break; }
-        userStars.set(userId, stars - cost);
+        trySpendStars(userId, cost);
         rec.balance += n; rec.boughtToday += n; rec.basis += cost;
         velosipe.available -= n;
         const trade = { type:'buy', amount:n, rate:velosipe.rate, stars:cost };
@@ -2574,7 +2779,7 @@ server.on('upgrade', (req, socket) => {
         if (currency === 'stars') {
           const stars = userStars.get(userId) || 0;
           if (stars < amount) { send({ type:'velosipe_error', text:'Недостаточно звёзд' }); break; }
-          userStars.set(userId, stars - amount);
+          trySpendStars(userId, amount);
         } else {
           const rec = getUserVlp(userId);
           if (rec.balance < amount) { send({ type:'velosipe_error', text:'Недостаточно $VLP' }); break; }

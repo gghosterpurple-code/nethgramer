@@ -28,7 +28,7 @@ const usesDb = !!DATABASE_URL;
 
 const ARRAY_COLLS = ['users', 'channels'];                       // data[coll] = [ {id, ...} ]
 const MAP_COLLS = ['messages', 'giftStock', 'userGifts', 'nftCounters', 'fakeMembers',
-                   'userStars', 'premiumUsernames', 'channelGifts', 'giveaways'];  // data[coll] = { key: value }
+                   'userStars', 'premiumUsernames', 'channelGifts', 'giveaways', 'dailyRewards'];  // data[coll] = { key: value }
 const META_KEYS = ['globalSoldOut', 'velosipe', 'premiumUsers'];  // одиночные значения
 
 const md5 = s => crypto.createHash('md5').update(s).digest('hex');
@@ -124,25 +124,32 @@ async function loadAll() {
 }
 
 // ── сохранение (только изменившиеся строки, один сохраняющий поток) ──
-let running = null, pendingRows = null;
+let running = null, pendingRows = null, pendingForce = false;
+// Курс VELO$IPE меняется каждые 15 с. Если писать его сразу, Neon не засыпает и съедает месячный лимит,
+// поэтому одно только движение рынка сохраняем раз в час. Сделки и любые другие данные пишутся сразу.
+const MARKET_KEY = rk('meta', 'velosipe');
+const MARKET_SAVE_MS = 60 * 60 * 1000;
+let lastMarketWrite = Date.now();
 
-function save(data) {
+function save(data, opts) {
   pendingRows = toRows(data);          // снимок состояния прямо сейчас
+  pendingForce = pendingForce || !!(opts && opts.force);
   if (!running) running = drain();
   return running;
 }
 async function drain() {
   try {
-    while (pendingRows) { const rows = pendingRows; pendingRows = null; await writeRows(rows); }
+    while (pendingRows) { const rows = pendingRows, force = pendingForce; pendingRows = null; pendingForce = false; await writeRows(rows, force); }
   } finally { running = null; }
 }
 function flush() { return running || Promise.resolve(); }
 
-async function writeRows(rows) {
+async function writeRows(rows, force) {
   const up = [], del = [];
   for (const [key, r] of rows) { const h = md5(r.json); if (digests.get(key) !== h) up.push([key, r, h]); }
   for (const key of digests.keys()) if (!rows.has(key)) del.push(key);
   if (!up.length && !del.length) return;
+  if (!force && !del.length && up.length === 1 && up[0][0] === MARKET_KEY && Date.now() - lastMarketWrite < MARKET_SAVE_MS) return;
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
@@ -164,6 +171,7 @@ async function writeRows(rows) {
     try { await client.query('ROLLBACK'); } catch (_) {}
     throw e;
   } finally { client.release(); }
+  if (up.some(x => x[0] === MARKET_KEY)) lastMarketWrite = Date.now();
   for (const [key, , h] of up) digests.set(key, h);
   for (const key of del) digests.delete(key);
 }

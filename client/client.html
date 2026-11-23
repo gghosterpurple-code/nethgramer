@@ -2880,6 +2880,113 @@ html.dark .out .photo-bubble .photo-caption{color:#fff}
 .tgv-cap:empty{padding:0 0 calc(10px + env(safe-area-inset-bottom))}
 .tgv-cap a{color:#8ec9ff}
 @media (hover:none){.tgv-nav{opacity:.55;width:64px}}
+
+/* ═════════ Подарки: статичный первый кадр, подарки каналов ═════════ */
+.gift-still{display:block;width:100%;height:100%;object-fit:contain;-webkit-user-drag:none}
+.ch-gift-item.is-nft .ch-gift-name,.ch-gift-item.is-nft .ch-gift-from{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.ch-gift-tag{font-size:9px;font-weight:700;color:rgba(255,215,0,.95);text-shadow:0 1px 2px rgba(0,0,0,.45)}
+.ch-gift-item.is-hidden-gift{opacity:.5}
+.ch-gift-item.is-hidden-gift::after{content:"Скрыт";position:absolute;left:4px;top:4px;padding:1px 5px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;font-weight:500}
+html.dark .ch-gift-item:not(.is-nft){background:var(--bg2)}
+
+/* ═════════ ПЛАВНЫЕ АНИМАЦИИ (в духе Telegram). Анимируются только transform и opacity ═════════ */
+:root{--ease-out:cubic-bezier(.22,1,.36,1);--ease-spring:cubic-bezier(.34,1.42,.64,1)}
+.bubble{animation:none}
+.msg-row.mx-new>*{will-change:transform,opacity}
+.msg-row.mx-new.out>*{transform-origin:100% 100%;animation:tgMsgOut .28s var(--ease-spring) both}
+.msg-row.mx-new.in>*{transform-origin:0 100%;animation:tgMsgIn .26s var(--ease-spring) both}
+@keyframes tgMsgOut{from{opacity:0;transform:translate3d(14px,24px,0) scale(.82)}60%{opacity:1}to{opacity:1;transform:none}}
+@keyframes tgMsgIn{from{opacity:0;transform:translate3d(-10px,16px,0) scale(.88)}60%{opacity:1}to{opacity:1;transform:none}}
+.msgs-area.chat-enter{animation:tgChatIn .22s var(--ease-out) both}
+@keyframes tgChatIn{from{opacity:0;transform:translate3d(0,10px,0)}to{opacity:1;transform:none}}
+.typing-bub{animation:tgMsgIn .2s var(--ease-out) both}
+.tdot{animation-timing-function:cubic-bezier(.45,0,.55,1)}
+
+/* кнопки и нажатия */
+.send-btn{transition:background .15s,transform .18s var(--ease-spring)}
+.send-btn:active{transform:scale(.88)}
+.send-btn>span{transition:opacity .16s ease,transform .22s var(--ease-spring)}
+.inp-wrap .icon-btn:active,.inp-cmd-btn:active,.hdr-btns .icon-btn:active,.sidebar-hdr .icon-btn:active{transform:scale(.88)}
+.icon-btn,.inp-cmd-btn{transition:background .15s,color .15s,transform .18s var(--ease-spring)}
+.auth-btn,.create-btn-ok,.ch-edit-save,.gvm-upgrade-btn,.gvm-transfer-btn,.ch-gift-btn,.prem-buy-btn{transition:background .15s,opacity .15s,transform .18s var(--ease-spring)}
+.auth-btn:active,.create-btn-ok:active,.ch-edit-save:active,.gvm-upgrade-btn:active,.gvm-transfer-btn:active,.ch-gift-btn:active,.prem-buy-btn:active{transform:scale(.97)}
+.profile-gift-item,.ch-gift-item{transition:transform .2s var(--ease-spring),box-shadow .2s}
+.profile-gift-item:active,.ch-gift-item:active{transform:scale(.95)}
+.tg-ripple-host{position:relative;overflow:hidden}
+.tg-ripple{position:absolute;border-radius:50%;background:currentColor;opacity:.13;pointer-events:none;transform:scale(0);animation:tgRipple .5s var(--ease-out) forwards}
+@keyframes tgRipple{to{transform:scale(1);opacity:0}}
+
+/* папки */
+.folder-tabs{position:relative}
+.folder-tab.active span::after{display:none}
+.folder-ind{position:absolute;left:0;bottom:0;height:3px;width:1px;border-radius:3px 3px 0 0;background:var(--tg-blue);transform-origin:left;transition:transform .28s var(--ease-out),width .28s var(--ease-out);pointer-events:none}
+html.dark .folder-ind{background:var(--accent)}
+.chats-list.folder-switch{animation:tgFolder .22s var(--ease-out) both}
+@keyframes tgFolder{from{opacity:0;transform:translate3d(10px,0,0)}to{opacity:1;transform:none}}
+
+/* окна: появление */
+.create-overlay.open>.create-modal,.ch-members-overlay.open>.ch-members-panel,.pun-modal-overlay.open>.pun-modal,.ch-edit-overlay.open>.ch-edit-panel,
+.stars-overlay.open>.stars-card,.gift-confirm-overlay.open>.gift-confirm-modal,.nft-transfer-overlay.open>.nft-transfer-modal,.gift-view-overlay.open>.gift-view-modal,
+.badge-picker-overlay.open>.badge-picker-modal,.prem-overlay.open>*,.settings-overlay.open>.settings-panel,.contact-profile-overlay.open>.contact-profile-panel,.gift-shop-overlay.open>.gift-shop-panel,.profile-overlay.open>.profile-panel{animation:tgPanelIn .26s var(--ease-spring) both}
+@keyframes tgPanelIn{from{opacity:0;transform:scale(.92) translate3d(0,10px,0)}to{opacity:1;transform:none}}
+.create-overlay.open,.ch-members-overlay.open,.pun-modal-overlay.open,.ch-info-overlay.open,.ch-edit-overlay.open,.stars-overlay.open,.gift-confirm-overlay.open,.nft-transfer-overlay.open,.gift-view-overlay.open,.badge-picker-overlay.open,.prem-overlay.open,.settings-overlay.open,.contact-profile-overlay.open,.gift-shop-overlay.open,.profile-overlay.open{animation:tgFade .18s ease both}
+.menu-overlay.open>.menu-backdrop{animation:tgFade .22s ease both}
+.menu-overlay.open>.menu-panel{animation:tgDrawerIn .28s var(--ease-out) both}
+.ch-info-overlay.open>.ch-info-panel{animation:tgSideIn .28s var(--ease-out) both}
+@keyframes tgFade{from{opacity:0}to{opacity:1}}
+@keyframes tgDrawerIn{from{transform:translate3d(-100%,0,0)}to{transform:none}}
+@keyframes tgSideIn{from{transform:translate3d(100%,0,0)}to{transform:none}}
+.emoji-picker.open{animation:tgPickerIn .2s var(--ease-spring) both;transform-origin:0 100%}
+@keyframes tgPickerIn{from{opacity:0;transform:scale(.9) translate3d(0,8px,0)}to{opacity:1;transform:none}}
+.mx-editbar{animation:tgBarUp .2s var(--ease-out) both}
+@keyframes tgBarUp{from{opacity:0;transform:translate3d(0,12px,0)}to{opacity:1;transform:none}}
+
+/* окна: закрытие (копия окна плавно исчезает, логика закрытия не задерживается) */
+.tg-ghost{display:flex!important;pointer-events:none!important;animation:tgFadeOut .18s ease forwards!important}
+.tg-ghost>*{animation:tgPanelOut .18s ease forwards!important}
+.tg-ghost.menu-overlay>.menu-panel{animation:tgDrawerOut .22s var(--ease-out) forwards!important}
+.tg-ghost.menu-overlay>.menu-backdrop{animation:tgFadeOut .2s ease forwards!important}
+.tg-ghost.ch-info-overlay>.ch-info-panel{animation:tgSideOut .22s var(--ease-out) forwards!important}
+@keyframes tgFadeOut{to{opacity:0}}
+@keyframes tgPanelOut{to{opacity:0;transform:scale(.95) translate3d(0,6px,0)}}
+@keyframes tgDrawerOut{to{transform:translate3d(-100%,0,0)}}
+@keyframes tgSideOut{to{transform:translate3d(100%,0,0)}}
+
+/* реакции */
+.mx-react.pop{animation:tgReactPop .42s var(--ease-spring) both}
+@keyframes tgReactPop{0%{transform:scale(.4)}60%{transform:scale(1.18)}100%{transform:none}}
+.tg-float{position:fixed;z-index:5001;pointer-events:none;font-size:18px;line-height:1;will-change:transform,opacity}
+
+/* покупка подарка */
+.tg-gift-fx{position:fixed;inset:0;z-index:4500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.42);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);cursor:pointer;animation:tgFade .2s ease both}
+.tg-gift-fx.out{animation:tgFadeOut .26s ease forwards}
+.tg-gift-card{display:flex;flex-direction:column;align-items:center;color:#fff;text-align:center;padding:16px;will-change:transform,opacity;animation:tgGiftPop .55s var(--ease-spring) both}
+@keyframes tgGiftPop{0%{opacity:0;transform:scale(.3) translate3d(0,40px,0)}55%{opacity:1}100%{opacity:1;transform:none}}
+.tg-gift-stage{position:relative;width:190px;height:190px;margin-bottom:12px}
+.tg-gift-stage::before{content:'';position:absolute;inset:-34px;border-radius:50%;background:radial-gradient(circle,rgba(255,214,90,.55),rgba(255,214,90,0) 66%);animation:tgGlow 1.6s ease-in-out infinite alternate}
+@keyframes tgGlow{from{opacity:.55;transform:scale(.9)}to{opacity:1;transform:scale(1.1)}}
+.tg-gift-anim{position:absolute;inset:0}
+.tg-gift-anim canvas,.tg-gift-anim img{width:100%!important;height:100%!important;object-fit:contain}
+.tg-gift-title{font-size:20px;font-weight:500;text-shadow:0 1px 6px rgba(0,0,0,.45);animation:tgBarUp .3s .18s var(--ease-out) both}
+.tg-gift-sub{font-size:15px;opacity:.9;margin-top:3px;text-shadow:0 1px 6px rgba(0,0,0,.45);animation:tgBarUp .3s .26s var(--ease-out) both}
+.tg-confetti{position:fixed;inset:0;width:100vw;height:100vh;z-index:5000;pointer-events:none}
+.gvm-reveal{animation:tgNftReveal .7s var(--ease-spring) both!important}
+@keyframes tgNftReveal{0%{transform:scale(.8) rotate(-2deg);filter:brightness(1.6)}60%{transform:scale(1.03) rotate(.5deg);filter:brightness(1.15)}100%{transform:none;filter:none}}
+.tg-shine{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.tg-shine::after{content:'';position:absolute;top:-30%;bottom:-30%;left:-60%;width:45%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-14deg);animation:tgShine .95s .12s var(--ease-out) forwards}
+@keyframes tgShine{to{left:125%}}
+
+/* телефон: чат выезжает справа, список слегка уходит влево */
+@media (max-width:700px){
+  .sidebar{transition:transform .3s var(--ease-out)}
+  body.mob-chat .sidebar{transform:translate3d(-22%,0,0)}
+  .chat-main{z-index:101;transform:translate3d(100%,0,0);transition:transform .3s var(--ease-out);box-shadow:-6px 0 22px rgba(0,0,0,.16)}
+  body.mob-chat .chat-main{transform:none}
+  .msgs-area.chat-enter{animation:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
 </head>
@@ -3434,11 +3541,35 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
+/* ── Защита от внедрения кода: всё, что приходит с сервера, очищается ДО попадания в интерфейс ── */
+const XSS_MAP = { '&':'＆', '<':'‹', '>':'›', '"':'”', "'":'’', '`':'’', '\\':'／' };
+function safeText(v) { return String(v).replace(/[&<>"'`\\]/g, ch => XSS_MAP[ch]); }
+function safeCss(v) { return /^[#\w\s(),.%-]+$/.test(v) && !/url|expression|import/i.test(v) ? v : ''; }
+function safeImageData(v) { return /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/i.test(v) ? v : ''; }
+function sanitizeIncoming(v, key, parent) {
+  if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = sanitizeIncoming(v[i], key, parent); return v; }
+  if (v && typeof v === 'object') { for (const k of Object.keys(v)) v[k] = sanitizeIncoming(v[k], k, v); return v; }
+  if (typeof v !== 'string') return v;
+  if (key === 'text') {
+    // Обычный текст экранируется при выводе; служебные карточки (фото, подарки) чистим по полям
+    if (v.charCodeAt(0) === 123) {
+      try {
+        const d = JSON.parse(v);
+        if (d && (d.isGift || d.isPhoto || d.isSticker || d.isNftTransfer)) return JSON.stringify(sanitizeIncoming(d));
+      } catch (e) {}
+    }
+    return v;
+  }
+  if (key === 'dataUrl') return parent && parent.type === 'lottie' ? v : safeImageData(v);
+  if (key === 'avatarUrl' || key === 'fromAvatarUrl') return normalizeAvatarUrl(v);
+  if (key === 'color' || key === 'fromColor' || key === 'nftGradient') return safeCss(v);
+  return safeText(v);
+}
 function normalizeAvatarUrl(url) {
   if (typeof url !== 'string') return null;
   const v = url.trim();
   if (!v) return null;
-  if (/^https?:\/\//i.test(v)) return v;
+  if (/^https?:\/\/[^\s"'<>`\\]+$/i.test(v)) return v;
   if (/^\/assets\/[\w.-]+$/.test(v)) return v;   // картинки с нашего сервера (аватар канала новостей)
   if (/^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/i.test(v)) return v;
   return null;
@@ -3495,7 +3626,7 @@ function connect() {
   ws.onerror = () => {};
 
   ws.onmessage = (e) => {
-    try { handleWS(JSON.parse(e.data)); } catch(err) { console.error('WS handleWS error:', err, e.data?.substring?.(0,200)); }
+    try { handleWS(sanitizeIncoming(JSON.parse(e.data))); } catch(err) { console.error('WS handleWS error:', err, e.data?.substring?.(0,200)); }
   };
 }
 
@@ -3591,7 +3722,6 @@ function handleWS(msg) {
     case 'registered': {
       const wasAlreadyLoggedIn = !!myUser;
       myUser = msg.user;
-      if (hasPremium) wsSend({ type: 'sync_premium', active: true });
       if (msg.user.isSuperUser !== undefined) isSuperUser = !!msg.user.isSuperUser;
       // Restore username from server (source of truth)
       // Username: server is source of truth, then localStorage fallback
@@ -4131,6 +4261,7 @@ function handleWS(msg) {
         const msgId = 'nft_' + upgraded.ts;
         giftMsgMap[msgId] = { giftId: upgraded.giftId, giftName: upgraded.giftName, giftPrice: upgraded.giftPrice, fromName: upgraded.fromName, message: upgraded.msg };
         openGiftView(msgId, upgraded);
+        if (typeof tgNftReveal === 'function') tgNftReveal();
       }, 350);
 
       // NOTE: do NOT call get_user_gifts here — it would cause a race condition
@@ -4149,8 +4280,39 @@ function handleWS(msg) {
       }
       if (typeof wornNft !== 'undefined' && wornNft && String(wornNft.ts) === tTs) { wornNft = null; if (myUser) myUser.wornNft = null; }
       rQJkdWSseE2mBwikUnnQ1gw5QpfGY2pyBh(myUser.id);
-      const toContact = contacts.get(msg.toUserId);
-      showToast('NFT', 'NFT передан пользователю ' + (toContact?.name || ''), 'logo');
+      const toContact = contacts.get(msg.toChannelId || msg.toUserId);
+      showToast('NFT', msg.toChannelId
+        ? 'NFT передан ' + (toContact?.isChannel ? 'каналу ' : 'группе ') + (toContact?.name || '')
+        : 'NFT передан пользователю ' + (toContact?.name || ''), 'logo');
+      break;
+    }
+
+    case 'channel_nft_upgraded': {
+      const up = msg.gift;
+      const chList = (channelGiftsCache[msg.channelId] || []).filter(g => String(g.ts) !== String(up.ts));
+      chList.push(up);
+      channelGiftsCache[msg.channelId] = chList;
+      renderChannelGiftsGrid(msg.channelId);
+      showToast('NFT', '🎉 Подарок превращён в NFT! Модель: ' + up.nftModelName + ' · ' + up.nftGradientName, '💎');
+      closeGiftView();
+      setTimeout(() => {
+        const mid = 'chgift_' + msg.channelId + '_' + up.ts;
+        giftMsgMap[mid] = { giftId: up.giftId, giftName: up.giftName, giftPrice: up.giftPrice, fromName: up.fromName, message: up.message || up.msg };
+        openGiftView(mid, up, { channelId: msg.channelId });
+        if (typeof tgNftReveal === 'function') tgNftReveal();
+      }, 350);
+      break;
+    }
+
+    case 'channel_nft_transferred': {
+      showToast('NFT', 'NFT передан: ' + (msg.toName || ''), 'logo');
+      break;
+    }
+
+    case 'channel_gift_failed': {
+      if (typeof msg.balance === 'number' && msg.balance >= 0 && !isStarsUnlimited) { starBalance = msg.balance; updateStarsUI(); }
+      showToast('Подарки', msg.text || 'Не удалось выполнить действие', '⚠️', '#e74c3c');
+      closeGiftView();
       break;
     }
 
@@ -4198,8 +4360,63 @@ function handleWS(msg) {
       // Server sends authoritative balance on reconnect
       if (typeof msg.balance === 'number' && msg.balance >= 0) {
         starBalance = msg.balance;
+        isStarsUnlimited = msg.balance >= 999_999_999;
+        if ('lastDaily' in msg) lastDailyReward = msg.lastDaily;
         updateStarsUI();
       }
+      break;
+    }
+
+    case 'premium_state': {
+      const wasPremium = hasPremium;
+      hasPremium = !!msg.active;
+      savePremiumState();
+      applyPremiumUI();
+      if (typeof renderBgPicker === 'function') { try { renderBgPicker(); } catch (e) {} }
+      if (!hasPremium && msg.notify && myUser) myUser.profileBg = null;
+      if (!hasPremium && wasPremium && typeof nameBadge !== 'undefined' && nameBadge) {
+        nameBadge = null;
+        try { localStorage.removeItem('ng_name_badge'); } catch (e) {}
+        if (typeof applyNameBadgeUI === 'function') applyNameBadgeUI();
+      }
+      if (msg.denied) showToast('Premium', 'Эта функция доступна только с Nethgram Premium', 'logo');
+      else if (msg.notify) showToast('Nethgram Premium', hasPremium ? '🎉 Вам выдан Nethgram Premium!' : 'Подписка Premium отключена', 'logo');
+      break;
+    }
+
+    case 'daily_ok': {
+      starBalance = msg.balance;
+      isStarsUnlimited = msg.balance >= 999_999_999;
+      lastDailyReward = msg.lastDaily;
+      const dNow = new Date();
+      starsHistory.unshift({ type: 'daily', amount: msg.amount, label: 'Ежедневная награда',
+        date: dNow.toLocaleDateString('ru-RU') + ' ' + dNow.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) });
+      updateStarsUI();
+      showRewardBurst();
+      showToast('Nethgram', '⭐ +' + msg.amount + ' звёзд! Ваш баланс: ' + (isStarsUnlimited ? '♾️' : starBalance.toLocaleString()), 'logo');
+      break;
+    }
+
+    case 'gift_failed': {
+      // Сервер отклонил покупку: убираем карточку и возвращаем настоящий баланс
+      if (msg.toId && msg.msgId) {
+        const fc = contacts.get(msg.toId);
+        if (fc) {
+          fc.messages = (fc.messages || []).filter(m => m.id !== msg.msgId);
+          if (typeof mxRefreshPreview === 'function') { mxRefreshPreview(fc); mxRerender(fc); }
+          renderChats();
+        }
+      }
+      if (typeof msg.balance === 'number') { starBalance = msg.balance; isStarsUnlimited = msg.balance >= 999_999_999; }
+      if ('lastDaily' in msg) lastDailyReward = msg.lastDaily;
+      if (msg.refund) starsHistory.unshift({ type: 'unlim', amount: msg.refund, label: 'Возврат: подарок не отправлен', date: new Date().toLocaleDateString('ru-RU') });
+      updateStarsUI();
+      showToast('Подарок не отправлен', msg.text || 'Попробуйте ещё раз', '⚠️', '#e74c3c');
+      break;
+    }
+
+    case 'error': {
+      if (msg.text) showToast('Ошибка', msg.text, '⚠️', '#e74c3c');
       break;
     }
 
@@ -4219,7 +4436,7 @@ function handleWS(msg) {
     }
 
     case 'channel_gift_received': {
-      if (!channelGiftsCache[msg.channelId]) channelGiftsCache[msg.channelId] = [];
+      channelGiftsCache[msg.channelId] = (channelGiftsCache[msg.channelId] || []).filter(g => String(g.ts) !== String(msg.gift.ts));
       channelGiftsCache[msg.channelId].push(msg.gift);
       // Re-render gifts grid if channel info panel is open
       renderChannelGiftsGrid(msg.channelId);
@@ -4798,6 +5015,7 @@ function showCodeToast(code) {
 }
 
 const TOAST_SVG = { '⚠️':'warn', '✕':'close', '🗑':'trash', '👋':'logout', '🔗':'link', '🙈':'eyeOff', '👁':'eye', '👑':'crown', '💎':'diamond' };
+function _toastEsc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 function showToast(from, text, iconType, color, contactId) {
   const wrap = document.getElementById('toastWrap');
   const t = document.createElement('div');
@@ -4817,8 +5035,8 @@ function showToast(from, text, iconType, color, contactId) {
   t.innerHTML = `
     ${iconHtml}
     <div class="t-body">
-      <div class="t-from" style="color:${color || 'var(--accent)'}">${from}</div>
-      <div class="t-text">${text}</div>
+      <div class="t-from" style="color:${color || 'var(--accent)'}">${_toastEsc(from)}</div>
+      <div class="t-text">${_toastEsc(text)}</div>
     </div>
     <div class="t-close" onclick="this.parentElement.remove()">${svgIc('close',18)}</div>
   `;
@@ -4928,6 +5146,7 @@ function renderChats(filter) {
 function makeChatItem(c) {
   const item = document.createElement('div');
   item.className = 'chat-item' + (c.id === activeId ? ' active' : '');
+  item.dataset.cid = c.id;
   const isBot = c.type === 'bot' || c.type === 'devbot';
   const isChannel = c.type === 'created';
   const onClass = (!isChannel && c.online) || isBot ? 'ava-on' : '';
@@ -5037,8 +5256,7 @@ function openChat(id) {
       if (!b || !window.lottie) return;
       if (lottieInstances['worn_hdr']) { try { lottieInstances['worn_hdr'].destroy(); } catch(e){} }
       b.innerHTML = '';
-      const anim = window.lottie.loadAnimation({ container: b, renderer: 'canvas', loop: true, autoplay: true, path: '/gifts/' + c.wornNft.nftModel + '.json' });
-      lottieInstances['worn_hdr'] = anim;
+      mountGiftStill(b, c.wornNft.nftModel);
     });
   }
 }
@@ -5161,7 +5379,6 @@ function doSend(c) {
     // Deduct stars
     if (!isStarsUnlimited) {
       starBalance -= totalCost;
-      wsSend({ type: 'sync_stars', balance: starBalance });
       updateStarsUI();
     }
 
@@ -5379,6 +5596,8 @@ const NETHGRAM_CMDS = [
   { name: '/mail', desc: '🔒 Рассылка всем: /mail [текст]' },
   { name: '/unlim', desc: '🔒 Накрутить ⭐ звёзды: /unlim [число]' },
   { name: '/sub', desc: '🔒 Накрутить подписчиков: /sub @канал [число]' },
+  { name: '/premium', desc: '🔒 Выдать Premium: /premium @юзернейм' },
+  { name: '/unpremium', desc: '🔒 Забрать Premium: /unpremium @юзернейм' },
 ];
 
 function handleCmdSuggest(val, c) {
@@ -5987,35 +6206,25 @@ function renderChannelGiftsGrid(channelId) {
     return;
   }
   container.innerHTML = '';
-  // Show latest gifts first
-  const sorted = [...gifts].reverse().slice(0, 30);
-  sorted.forEach((g, idx) => {
+  // Сначала новые подарки. Анимации нет: первый кадр, живая анимация — в карточке
+  [...gifts].reverse().slice(0, 30).forEach((g, idx) => {
     const item = document.createElement('div');
-    item.className = 'ch-gift-item';
+    item.className = 'ch-gift-item' + (g.isNft ? ' is-nft' : '') + (g.hidden ? ' is-hidden-gift' : '');
+    if (g.isNft) item.style.background = g.nftGradient || 'linear-gradient(135deg,#4287f5,#edf0f5)';
     const lId = 'chgl_' + channelId + '_' + idx;
     item.innerHTML =
+      (g.isNft ? '<div class="nft-badge-mini">NFT</div>' : '') +
       '<div class="ch-gift-lottie" id="' + lId + '"></div>' +
-      '<div class="ch-gift-name">' + (g.giftName || g.giftId) + '</div>' +
-      '<div class="ch-gift-from">от ' + (g.fromName || '?') + '</div>';
+      '<div class="ch-gift-name">' + _ntEsc(g.giftName || g.giftId) + '</div>' +
+      (g.isNft && g.nftTag ? '<div class="ch-gift-tag">' + _ntEsc(g.nftTag) + '</div>' : '') +
+      '<div class="ch-gift-from">от ' + _ntEsc(g.fromName || '?') + '</div>';
+    item.addEventListener('click', () => {
+      const msgId = 'chgift_' + channelId + '_' + g.ts;
+      giftMsgMap[msgId] = { giftId: g.giftId, giftName: g.giftName, giftPrice: g.giftPrice, fromName: g.fromName, message: g.message || g.msg };
+      openGiftView(msgId, g, { channelId });
+    });
     container.appendChild(item);
-    // Play lottie once then freeze
-    const lottieEl = document.getElementById(lId);
-    if (lottieEl) {
-      renderGiftFallback(lottieEl, g.giftId);
-      const delay = idx * 60;
-      function startChLottie() {
-        const el = document.getElementById(lId);
-        if (!el || !window.lottie) return;
-        if (lottieInstances[lId]) { try { lottieInstances[lId].destroy(); } catch(e){} }
-        el.innerHTML = '';
-        const anim = window.lottie.loadAnimation({ container: el, renderer: 'canvas', loop: false, autoplay: true, path: '/gifts/' + g.giftId + '.json' });
-        anim.addEventListener('data_failed', () => renderGiftFallback(el, g.giftId));
-        anim.addEventListener('complete', () => { anim.pause(); anim.goToAndStop(anim.totalFrames - 1, true); });
-        lottieInstances[lId] = anim;
-      }
-      if (window.lottie) setTimeout(startChLottie, delay);
-      else ensureLottie(() => setTimeout(startChLottie, delay));
-    }
+    attachLazyLottie(item, item.querySelector('.ch-gift-lottie'), g.isNft ? g.nftModel : g.giftId);
   });
 }
 
@@ -6199,8 +6408,6 @@ function updateStarsUI() {
   { const _e=document.getElementById('starsBalanceNum'); if(_e) _e.textContent = displayVal; }
   { const _e=document.getElementById('menuStarNum'); if(_e) _e.textContent = displayVal; }
   { const _e=document.getElementById('starsCount'); if(_e) _e.textContent = displayVal; }
-  // Sync balance to server
-  if (ws && ws.readyState === 1) wsSend({ type: 'sync_stars', balance: starBalance });
   updateDailyBtn();
   renderStarsHistory();
 }
@@ -6291,20 +6498,8 @@ function startCountdownTimer() {
 
 function claimDaily() {
   if (!canClaimDaily()) return;
-  lastDailyReward = Date.now();
-  starBalance += 500;
-  
-  const now = new Date();
-  starsHistory.unshift({
-    type: 'daily',
-    amount: 500,
-    label: 'Ежедневная награда',
-    date: now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}),
-  });
-
-  updateStarsUI();
-  showRewardBurst();
-  showToast('Nethgram', '⭐ +500 звёзд! Ваш баланс: ' + starBalance.toLocaleString(), 'logo');
+  // Награду начисляет сервер: он же следит, что прошло 24 часа
+  wsSend({ type: 'claim_daily' });
 }
 
 function renderStarsHistory() {
@@ -6504,7 +6699,7 @@ function loadLottie(containerId, giftId, loop = true, autoplay = true) {
     const el = document.getElementById(containerId);
     if (!el) return;
     if (!lottieReady) renderGiftFallback(el, giftId);
-  }, 1400);
+  }, 10000);
 
   lottieInstances[containerId] = anim;
   pruneOldLottieInstances();
@@ -6728,7 +6923,6 @@ function sendGift() {
     // Restore to big number so UI stays showing "unlimited"
     starBalance = 999_999_999;
   }
-  wsSend({ type: 'sync_stars', balance: starBalance });
   updateStarsUI();
 
   const now = new Date();
@@ -6976,10 +7170,16 @@ let giftViewCurrentGift = null; // the gift entry currently shown in view modal
 
 const giftMsgMap = {};
 
-function openGiftView(msgId, giftEntry) {
+let giftViewChannelId = null;  // id канала/группы, если открыт подарок канала
+function canManageChannelGiftsUi(channelId) {
+  const c = contacts.get(channelId);
+  return !!c && !!myUser && (c.ownerId === myUser.id || (c.admins || []).includes(myUser.id));
+}
+function openGiftView(msgId, giftEntry, ctx) {
   // giftEntry: full gift object from receivedGifts (has isNft, nftModel, etc.)
   const data = giftMsgMap[msgId];
   if (!data && !giftEntry) return;
+  giftViewChannelId = (ctx && ctx.channelId) || null;
   let g = giftEntry || data;
 
   // If opened from chat bubble (no giftEntry), try to find the full NFT object
@@ -7068,7 +7268,22 @@ function openGiftView(msgId, giftEntry) {
   const isOwnGift = giftEntry && giftEntry.nftOwnerId === myUser?.id ||
                     giftEntry && giftEntry.fromId !== undefined && !giftEntry.isNft;
 
-  if (giftEntry && myUser) {
+  if (giftViewChannelId) {
+    // Подарок канала: смотреть могут все, кнопки — только владелец и админы (без «Носить»)
+    if (canManageChannelGiftsUi(giftViewChannelId)) {
+      if (hideBtn) {
+        hideBtn.style.display = '';
+        hideBtn.innerHTML = g.hidden ? svgIc('eye',18) + ' Показать в канале' : svgIc('eyeOff',18) + ' Скрыть из канала';
+      }
+      if (isNft) transferBtn.style.display = '';
+      else if (NFT_UPGRADEABLE.has(g.giftId)) {
+        const chUpCost = Math.ceil((g.giftPrice||0) * 0.15);
+        upgradeBtn.style.display = '';
+        upgradeBtn.innerHTML = svgIc('sparkles',18) + ' Превратить в NFT · <img src="' + STAR_IMG + '" style="width:14px;height:14px;vertical-align:middle"> ' + chUpCost.toLocaleString();
+        upgradeBtn.disabled = (starBalance < chUpCost);
+      }
+    }
+  } else if (giftEntry && myUser) {
     const _mineList = receivedGifts[myUser.id] || [];
     const _isMine = _mineList.some(rg => String(rg.ts) === String(g.ts) && rg.giftId === g.giftId);
     if (_isMine && hideBtn) {
@@ -7141,6 +7356,20 @@ function handleGiftViewBackdrop(e) {
 function toggleGiftHidden() {
   const g = giftViewCurrentGift;
   if (!g || !myUser) return;
+  if (giftViewChannelId) {
+    const chId = giftViewChannelId;
+    if (!canManageChannelGiftsUi(chId)) return;
+    const chEntry = (channelGiftsCache[chId] || []).find(rg => String(rg.ts) === String(g.ts));
+    const nextHidden = !g.hidden;
+    g.hidden = nextHidden;
+    if (chEntry) chEntry.hidden = nextHidden;
+    wsSend({ type: 'toggle_gift_hidden', channelId: chId, giftTs: g.ts, hidden: nextHidden });
+    const chBtn = document.getElementById('gvmHideBtn');
+    if (chBtn) chBtn.innerHTML = nextHidden ? svgIc('eye',18) + ' Показать в канале' : svgIc('eyeOff',18) + ' Скрыть из канала';
+    showToast('Подарки', nextHidden ? 'Подарок скрыт: его видят только админы' : 'Подарок снова виден всем', nextHidden ? '🙈' : '👁');
+    renderChannelGiftsGrid(chId);
+    return;
+  }
   const list = receivedGifts[myUser.id] || [];
   const entry = list.find(rg => String(rg.ts) === String(g.ts));
   if (!entry) return;
@@ -7347,8 +7576,7 @@ function applyBadgeToElement(elementId) {
       if (!b || !window.lottie) return;
       if (lottieInstances['worn_badge_' + elementId]) { try { lottieInstances['worn_badge_' + elementId].destroy(); } catch(e){} }
       b.innerHTML = '';
-      const anim = window.lottie.loadAnimation({ container: b, renderer: 'canvas', loop: true, autoplay: true, path: '/gifts/' + wornNft.nftModel + '.json' });
-      lottieInstances['worn_badge_' + elementId] = anim;
+      mountGiftStill(b, wornNft.nftModel);
     });
   }
 
@@ -7469,7 +7697,6 @@ function pickProfileBg(id) {
   if ((myUser.profileBg || null) === id) return;
   myUser.profileBg = id;
   applyWornNftUI(); renderBgPicker();
-  if (hasPremium) wsSend({ type: 'sync_premium', active: true });
   wsSend({ type: 'set_profile_bg', profileBg: id });
 }
 function repaintContactHero(userId) {
@@ -7517,12 +7744,7 @@ function updateNameBadge(elementId, worn) {
     if (!b || !window.lottie) return;
     if (lottieInstances[badgeId]) { try { lottieInstances[badgeId].destroy(); } catch(e){} }
     b.innerHTML = '';
-    const anim = window.lottie.loadAnimation({
-      container: b, renderer: 'canvas', loop: true, autoplay: true,
-      path: '/gifts/' + worn.nftModel + '.json',
-    });
-    anim.addEventListener('data_failed', () => { b.textContent = '👑'; b.style.cssText = 'font-size:0.9em'; });
-    lottieInstances[badgeId] = anim;
+    mountGiftStill(b, worn.nftModel);
   });
 }
 
@@ -7543,11 +7765,7 @@ function renderContactWornBadge(userId) {
     if (!window.lottie) return;
     if (lottieInstances['worn_contact_' + userId]) { try { lottieInstances['worn_contact_' + userId].destroy(); } catch(e){} }
     badge.innerHTML = '';
-    const anim = window.lottie.loadAnimation({
-      container: badge, renderer: 'canvas', loop: true, autoplay: true,
-      path: '/gifts/' + c.wornNft.nftModel + '.json',
-    });
-    lottieInstances['worn_contact_' + userId] = anim;
+    mountGiftStill(badge, c.wornNft.nftModel);
   });
 }
 
@@ -7555,6 +7773,7 @@ function closeGiftView() {
   document.getElementById('giftViewOverlay').classList.remove('open');
   if (giftViewAnim) { try{giftViewAnim.destroy();}catch(e){} giftViewAnim=null; }
   giftViewCurrentGift = null;
+  giftViewChannelId = null;
 }
 
 // ── NFT UPGRADE ──
@@ -7573,7 +7792,7 @@ function upgradeGiftToNft() {
   updateStarsUI();
   document.getElementById('gvmUpgradeBtn').disabled = true;
   document.getElementById('gvmUpgradeBtn').textContent = 'Улучшение…';
-  wsSend({ type: 'upgrade_to_nft', giftTs: g.ts });
+  wsSend({ type: 'upgrade_to_nft', giftTs: g.ts, channelId: giftViewChannelId || undefined });
 }
 
 // ── NFT TRANSFER ──
@@ -7612,7 +7831,7 @@ function openNftTransfer() {
     });
   }
 
-  renderNftTransferList([...contacts.values()].filter(c => c.type === 'user'));
+  renderNftTransferList(nftTransferTargets(''));
   document.getElementById('nftTransferOverlay').classList.add('open');
 }
 
@@ -7623,36 +7842,43 @@ function closeNftTransfer() {
   nftTransferSelectedId = null;
 }
 
-function filterNftTransferList(q) {
-  const users = [...contacts.values()].filter(c =>
-    c.type === 'user' && (
-      !q || c.name.toLowerCase().includes(q.toLowerCase()) ||
-      (c.username && c.username.toLowerCase().includes(q.toLowerCase()))
+function nftTransferTargets(q) {
+  const needle = String(q || '').toLowerCase();
+  return [...contacts.values()].filter(c =>
+    (c.type === 'user' || c.type === 'created') && c.id !== giftViewChannelId && (
+      !needle || String(c.name || '').toLowerCase().includes(needle) ||
+      String(c.username || '').toLowerCase().includes(needle)
     )
   );
-  renderNftTransferList(users);
 }
 
-function renderNftTransferList(users) {
+function filterNftTransferList(q) {
+  renderNftTransferList(nftTransferTargets(q));
+}
+
+function renderNftTransferList(targets) {
   const list = document.getElementById('nftTransferList');
   list.innerHTML = '';
-  if (!users.length) {
-    list.innerHTML = '<div style="padding:16px;text-align:center;color:#aaa;font-size:13px">Нет контактов</div>';
+  if (!targets.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:#aaa;font-size:13px">Ничего не найдено</div>';
     return;
   }
-  users.forEach(u => {
+  targets.forEach(u => {
+    fixContactLook(u);
     const row = document.createElement('div');
     row.className = 'nft-transfer-user' + (u.id === nftTransferSelectedId ? ' active' : '');
     if (u.id === nftTransferSelectedId) row.style.background = 'var(--bg2)';
     const avaHtml = u.avatarUrl
       ? '<img src="' + u.avatarUrl + '" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0">'
-      : '<div class="ava-sm" style="background:' + u.color + ';width:34px;height:34px;flex-shrink:0">' + u.initials + '</div>';
-    row.innerHTML = avaHtml + '<div><div style="font-size:14px;font-weight:600">' + u.name + '</div>' +
-      (u.username ? '<div style="font-size:12px;color:#aaa">@' + u.username + '</div>' : '') + '</div>';
+      : '<div class="ava-sm" style="background:' + u.color + ';width:34px;height:34px;flex-shrink:0">' + _ntEsc(u.initials) + '</div>';
+    const kind = u.type === 'created' ? (u.isChannel ? 'Канал' : 'Группа') : '';
+    const sub = [kind, u.username ? '@' + String(u.username).replace(/^@/, '') : ''].filter(Boolean).join(' · ');
+    row.innerHTML = avaHtml + '<div><div style="font-size:14px;font-weight:600">' + _ntEsc(u.name) + '</div>' +
+      (sub ? '<div style="font-size:12px;color:#aaa">' + _ntEsc(sub) + '</div>' : '') + '</div>';
     row.addEventListener('click', () => {
       nftTransferSelectedId = u.id;
       document.getElementById('nftTransferConfirmBtn').disabled = false;
-      renderNftTransferList(users);
+      renderNftTransferList(targets);
     });
     list.appendChild(row);
   });
@@ -7660,7 +7886,15 @@ function renderNftTransferList(users) {
 
 function confirmNftTransfer() {
   if (!nftTransferGift || !nftTransferSelectedId) return;
-  wsSend({ type: 'transfer_nft', giftTs: nftTransferGift.ts, toUserId: nftTransferSelectedId });
+  const target = contacts.get(nftTransferSelectedId);
+  const toChannel = !!target && target.type === 'created';
+  wsSend({
+    type: 'transfer_nft',
+    giftTs: nftTransferGift.ts,
+    toUserId: toChannel ? undefined : nftTransferSelectedId,
+    toChannelId: toChannel ? nftTransferSelectedId : undefined,
+    fromChannelId: giftViewChannelId || undefined,
+  });
   closeNftTransfer();
   closeGiftView();
 }
@@ -7694,55 +7928,88 @@ function rQJkdWSseE2mBwikUnnQ1gw5QpfGY2pyBh(userId) {
   }
 }
 
-// ── LOTTIE for profile gift cards — play once then freeze on last frame ──
-function attachLazyLottie(item, lottieEl, giftId) {
-  const lId = lottieEl.id;
+// ── СТАТИЧНЫЕ ПОДАРКИ ──
+// В сетках подарков нет живых Lottie-плееров: первый кадр рендерится один раз в картинку,
+// плеер сразу уничтожается, результат кешируется. Анимация играет только в открытой карточке.
+const giftFrameCache = new Map();   // модель -> Promise<dataURL|null>
+const giftFrameQueue = [];
+let giftFrameBusy = 0;
+const GIFT_FRAME_PARALLEL = 2, GIFT_FRAME_SIZE = 224;
 
-  // Show fallback while lottie loads
-  renderGiftFallback(lottieEl, giftId);
-
-  function startLottie() {
-    const el = document.getElementById(lId);
-    if (!el) return;
-
+function pumpGiftFrames() {
+  while (giftFrameBusy < GIFT_FRAME_PARALLEL && giftFrameQueue.length) {
+    giftFrameBusy++;
+    const job = giftFrameQueue.shift();
+    renderGiftFrame(job.model).then(url => {
+      giftFrameBusy--;
+      job.resolve(url);
+      pumpGiftFrames();
+    });
+  }
+}
+function renderGiftFrame(model) {
+  return new Promise(resolve => {
     const L = window.lottie;
-    if (!L) { renderGiftFallback(el, giftId); return; }
-
-    if (lottieInstances[lId]) {
-      try { lottieInstances[lId].destroy(); } catch(e) {}
-      delete lottieInstances[lId];
-    }
-
-    el.innerHTML = '';
-    // loop:false — plays once then stops on last frame
-    const anim = L.loadAnimation({
-      container: el,
-      renderer: 'canvas',
-      loop: false,
-      autoplay: true,
-      path: '/gifts/' + giftId + '.json',
-    });
-
-    anim.addEventListener('data_failed', () => renderGiftFallback(el, giftId));
-
-    // On complete — freeze on last frame (canvas stays visible)
-    anim.addEventListener('complete', () => {
-      anim.pause();
-      anim.goToAndStop(anim.totalFrames - 1, true);
-    });
-
-    lottieInstances[lId] = anim;
+    if (!L) { resolve(null); return; }
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + GIFT_FRAME_SIZE + 'px;height:' + GIFT_FRAME_SIZE + 'px;pointer-events:none';
+    document.body.appendChild(host);
+    let anim = null, done = false;
+    const finish = url => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { if (anim) anim.destroy(); } catch (e) {}
+      host.remove();
+      resolve(url);
+    };
+    const timer = setTimeout(() => finish(null), 10000);
+    try {
+      anim = L.loadAnimation({ container: host, renderer: 'canvas', loop: false, autoplay: false, path: '/gifts/' + model + '.json' });
+      anim.addEventListener('data_failed', () => finish(null));
+      anim.addEventListener('DOMLoaded', () => {
+        try {
+          anim.goToAndStop(0, true);
+          const cv = host.querySelector('canvas');
+          finish(cv ? cv.toDataURL('image/webp', 0.92) : null);
+        } catch (e) { finish(null); }
+      });
+    } catch (e) { finish(null); }
+  });
+}
+function getGiftFrame(model) {
+  if (!giftFrameCache.has(model)) {
+    giftFrameCache.set(model, new Promise(resolve => {
+      giftFrameQueue.push({ model, resolve });
+      pumpGiftFrames();
+    }).then(url => { if (!url) giftFrameCache.delete(model); return url; }));
   }
-
-  // Stagger by index to avoid freezing page with many gifts
-  const idxMatch = lId.match(/_(\d+)$/);
-  const delay = idxMatch ? parseInt(idxMatch[1]) * 60 : 0;
-
-  if (window.lottie) {
-    setTimeout(startLottie, delay);
-  } else {
-    ensureLottie(() => setTimeout(startLottie, delay));
-  }
+  return giftFrameCache.get(model);
+}
+// Кадры считаются только для подарков, которые реально видны на экране
+const giftFrameObserver = ('IntersectionObserver' in window) ? new IntersectionObserver(entries => {
+  entries.forEach(en => {
+    if (!en.isIntersecting) return;
+    giftFrameObserver.unobserve(en.target);
+    mountGiftFrame(en.target);
+  });
+}, { rootMargin: '160px' }) : null;
+function mountGiftFrame(el) {
+  const model = el.dataset.giftModel;
+  ensureLottie(() => getGiftFrame(model).then(url => {
+    if (!url || !el.isConnected || el.dataset.giftModel !== model) return;
+    el.innerHTML = '<img class="gift-still" src="' + url + '" alt="" draggable="false">';
+  }));
+}
+function mountGiftStill(el, model) {
+  el.dataset.giftModel = model;
+  mountGiftFrame(el);
+}
+function attachLazyLottie(item, lottieEl, giftId) {
+  renderGiftFallback(lottieEl, giftId);
+  lottieEl.dataset.giftModel = giftId;
+  if (giftFrameObserver) giftFrameObserver.observe(lottieEl);
+  else mountGiftFrame(lottieEl);
 }
 
 function renderProfileGifts(userId, container) {
@@ -7971,7 +8238,7 @@ function previewCut(t, n) {
   return out;
 }
 function emojiPrev(t) {
-  return String(t || '').replace(/\[\[e:(\d+_\d+)\]\]/g, '<img class="inline-emoji prev-emoji" src="/assets/emoji_$1.png" alt="">');
+  return String(t || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])).replace(/\[\[e:(\d+_\d+)\]\]/g, '<img class="inline-emoji prev-emoji" src="/assets/emoji_$1.png" alt="">');
 }
 
 function toggleEmojiPicker(btn) {
@@ -8858,7 +9125,7 @@ function applyPremiumUI() {
   if (pb) pb.style.display = hasPremium ? 'inline-flex' : 'none';
   // Buy button text
   const btn = document.getElementById('premBuyBtn');
-  if (btn) btn.textContent = hasPremium ? 'Premium активен' : 'Подключить за ' + PLAN_DATA[selectedPlan].monthly;
+  if (btn) btn.textContent = hasPremium ? 'Premium активен' : 'Как получить Premium';
   renderBgPicker();
 }
 
@@ -8881,6 +9148,9 @@ function closePremiumModal() {
 
 function openPaymentModal() {
   if (hasPremium) { showToast('Premium', '✅ Подписка уже активна!', 'logo'); return; }
+  // Онлайн-оплаты пока нет: подписку выдаёт администратор
+  showToast('Nethgram Premium', 'Premium выдаёт администратор Nethgram. Напишите ему, чтобы подключить.', 'logo');
+  return;
   const d = PLAN_DATA[selectedPlan];
   document.getElementById('payProductName').textContent = d.label;
   document.getElementById('payRowLabel').textContent = d.rowLabel;
@@ -8947,12 +9217,7 @@ function processPayment() {
   btn.disabled = true;
 
   setTimeout(() => {
-    hasPremium = true;
-    savePremiumState();
-    wsSend({ type: 'sync_premium', active: true });
     closeAllPremiumModals();
-    applyPremiumUI();
-    showToast('Nethgram Premium', '🎉 Подписка успешно активирована!', 'logo');
     btn.textContent = 'ГОТОВО';
     btn.disabled = false;
   }, 1800);
@@ -9181,8 +9446,7 @@ function openContactProfile(userId) {
       if (!b || !window.lottie) return;
       if (lottieInstances['worn_cp_' + userId]) { try { lottieInstances['worn_cp_' + userId].destroy(); } catch(e){} }
       b.innerHTML = '';
-      const anim = window.lottie.loadAnimation({ container: b, renderer: 'canvas', loop: true, autoplay: true, path: '/gifts/' + c.wornNft.nftModel + '.json' });
-      lottieInstances['worn_cp_' + userId] = anim;
+      mountGiftStill(b, c.wornNft.nftModel);
     });
   }
   // Hero background — use worn NFT gradient if set
@@ -9357,7 +9621,7 @@ function closeContactProfile() {
     <div class="nft-transfer-body">
       <h4>Передать NFT</h4>
       <p>Выберите пользователя. После передачи NFT исчезнет из вашего профиля.</p>
-      <input class="nft-transfer-search" id="nftTransferSearch" placeholder="Поиск пользователя..." oninput="filterNftTransferList(this.value)">
+      <input class="nft-transfer-search" id="nftTransferSearch" placeholder="Поиск: люди, каналы, группы" oninput="filterNftTransferList(this.value)">
       <div class="nft-transfer-list" id="nftTransferList"></div>
       <div class="nft-transfer-footer">
         <button class="nft-transfer-cancel" onclick="closeNftTransfer()">Отмена</button>
@@ -10049,7 +10313,6 @@ function closeVelosipe() {
   if (VLP.chart) { VLP.chart.destroy(); VLP.chart = null; } VLP.built = null;
 }
 function vlpRequest() {
-  wsSend({ type:'sync_stars', balance:starBalance });
   wsSend({ type:'get_velosipe_market', period:VLP.period });
   if (VLP.sheetId) wsSend({ type:'get_velosipe_history', target:VLP.sheetId, period:VLP.period });
 }
@@ -10390,7 +10653,6 @@ function tradeSubmit() {
   T.pending = true; document.getElementById('vlpGo').disabled = true;
   setTimeout(() => { if (VLP.trade && VLP.trade.pending) { VLP.trade.pending = false; const g = document.getElementById('vlpGo'); if (g) g.disabled = false; } }, 6000);
   const base = { period: VLP.period };
-  wsSend({ type:'sync_stars', balance:starBalance });
   if (T.mode === 'buy') wsSend({ type:'buy_velosipe', amount:n, ...base });
   else if (T.mode === 'sell') wsSend({ type:'sell_velosipe', amount:n, ...base });
   else if (T.mode === 'invest') wsSend({ type:'invest_asset', assetId:T.assetId, currency:T.currency, amount:n, ...base });
@@ -10657,7 +10919,7 @@ function mxStartEdit(c, m) {
   let bar = document.getElementById('mxEditBar');
   if (!bar) { bar = document.createElement('div'); bar.id = 'mxEditBar'; bar.className = 'mx-editbar'; inp.prepend(bar); }
   bar.innerHTML = '<span class="mx-eb-ic">' + svgIc('pencil', 22) + '</span>' +
-    '<div class="mx-eb-txt"><b>Редактирование</b><span>' + emojiPrev(mxEsc(previewCut(m.text, 80))) + '</span></div>' +
+    '<div class="mx-eb-txt"><b>Редактирование</b><span>' + emojiPrev(previewCut(m.text, 80)) + '</span></div>' +
     '<button type="button" class="mx-eb-x" aria-label="Отменить редактирование">' + svgIc('close', 20) + '</button>';
   bar.querySelector('.mx-eb-x').onclick = mxCancelEdit;
   inp.classList.add('editing', 'has-text');
@@ -10962,6 +11224,333 @@ function openPhotoViewer(imgId) {
   void tgv.el.offsetWidth;            // пересчёт стилей, чтобы сработала плавная анимация появления
   tgv.el.classList.add('open');
 }
+</script>
+<script>
+/* ═════════ ПЛАВНЫЕ АНИМАЦИИ ═════════ */
+(function () {
+  const motionOK = () => !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const EASE = 'cubic-bezier(.22,1,.36,1)';
+  let bulk = 0;
+
+  /* ── Сообщения: анимируем только новые, история открывается мгновенно ── */
+  ['renderMessages', 'renderChannelMessages'].forEach(name => {
+    const orig = window[name];
+    window[name] = function () { bulk++; try { return orig.apply(this, arguments); } finally { bulk--; } };
+  });
+  const wrapAppend = fn => function (area) {
+    if (bulk || !area || !area.isConnected || !motionOK()) return fn.apply(this, arguments);
+    const before = area.lastElementChild;
+    const nearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 90;
+    const r = fn.apply(this, arguments);
+    const row = area.lastElementChild;
+    if (row && row !== before && row.classList.contains('msg-row') && !row.classList.contains('mx-new')) {
+      row.classList.add('mx-new');
+      row.addEventListener('animationend', () => row.classList.remove('mx-new'), { once: true });
+      if (nearBottom) {
+        // Вся лента мягко поднимается вместе с новым сообщением
+        const h = row.offsetHeight;
+        if (h > 0 && h < 500) area.animate([{ transform: 'translate3d(0,' + h + 'px,0)' }, { transform: 'none' }], { duration: 230, easing: EASE });
+      }
+    }
+    return r;
+  };
+  window.appendMsg = wrapAppend(window.appendMsg);
+  appendChannelMsg = wrapAppend(appendChannelMsg);
+
+  /* ── Открытие чата ── */
+  const origOpenChat = window.openChat;
+  window.openChat = function (id) {
+    const changed = id !== activeId;
+    const r = origOpenChat.apply(this, arguments);
+    const area = document.getElementById('msgsArea');
+    if (changed && area && motionOK()) {
+      area.classList.remove('chat-enter'); void area.offsetWidth; area.classList.add('chat-enter');
+      area.addEventListener('animationend', e => { if (e.target === area) area.classList.remove('chat-enter'); }, { once: true });
+    }
+    return r;
+  };
+
+  /* ── Список чатов: строки плавно меняются местами ── */
+  let skipFlip = false;
+  const origRenderChats = window.renderChats;
+  window.renderChats = function () {
+    const list = document.getElementById('chatsList');
+    const canFlip = list && !skipFlip && list.offsetParent !== null && motionOK();
+    const old = new Map();
+    if (canFlip) list.querySelectorAll('.chat-item[data-cid]').forEach(el => old.set(el.dataset.cid, el.offsetTop));
+    const r = origRenderChats.apply(this, arguments);
+    if (canFlip && old.size) {
+      const top = list.scrollTop, bottom = top + list.clientHeight;
+      list.querySelectorAll('.chat-item[data-cid]').forEach(el => {
+        const prev = old.get(el.dataset.cid), cur = el.offsetTop;
+        if (cur > bottom || cur + el.offsetHeight < top) return;
+        if (prev === undefined) el.animate([{ opacity: 0, transform: 'translate3d(0,-10px,0)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE });
+        else if (prev !== cur) el.animate([{ transform: 'translate3d(0,' + (prev - cur) + 'px,0)' }, { transform: 'none' }], { duration: 260, easing: EASE });
+      });
+    }
+    return r;
+  };
+
+  /* ── Папки: индикатор скользит ── */
+  const origTabs = window.renderFolderTabs;
+  window.renderFolderTabs = function () {
+    const el = document.getElementById('folderTabs');
+    if (!el) return;
+    if (!el.querySelector('.folder-tab')) { origTabs(); el.insertAdjacentHTML('beforeend', '<span class="folder-ind"></span>'); }
+    el.querySelectorAll('.folder-tab').forEach((b, i) => b.classList.toggle('active', CHAT_FOLDERS[i][0] === currentFolder));
+    const a = el.querySelector('.folder-tab.active'), ind = el.querySelector('.folder-ind');
+    if (a && ind && a.offsetWidth) { ind.style.width = (a.offsetWidth - 16) + 'px'; ind.style.transform = 'translateX(' + (a.offsetLeft + 8) + 'px)'; }
+  };
+  window.addEventListener('resize', () => window.renderFolderTabs());
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => window.renderFolderTabs());
+  const origFolder = window.setChatFolder;
+  window.setChatFolder = function (id) {
+    if (id === currentFolder) return;
+    skipFlip = true;
+    try { origFolder(id); } finally { skipFlip = false; }
+    const list = document.getElementById('chatsList');
+    if (list && motionOK()) {
+      list.classList.remove('folder-switch'); void list.offsetWidth; list.classList.add('folder-switch');
+      list.addEventListener('animationend', () => list.classList.remove('folder-switch'), { once: true });
+    }
+  };
+
+  /* ── Плавное закрытие окон ── */
+  const ghostOf = id => {
+    const o = document.getElementById(id);
+    if (!o || !o.classList.contains('open') || !motionOK()) return null;
+    const g = o.cloneNode(true);
+    g.removeAttribute('id');
+    g.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+    const from = o.querySelectorAll('canvas'), to = g.querySelectorAll('canvas');
+    to.forEach((c, i) => { if (i < 24 && from[i] && from[i].width) { try { c.width = from[i].width; c.height = from[i].height; c.getContext('2d').drawImage(from[i], 0, 0); } catch (e) {} } });
+    g.classList.add('tg-ghost');
+    return { g, o };
+  };
+  [['closeMenu','menuOverlay'],['closeCreateModal','createOverlay'],['closeMembersOverlay','chMembersOverlay'],['closePunModal','punModalOverlay'],
+   ['closeChannelInfo','chInfoOverlay'],['closeChannelEdit','chEditOverlay'],['closeStars','starsOverlay'],['closeGiftShop','giftShopOverlay'],
+   ['closeGiftConfirm','giftConfirmOverlay'],['closeNftTransfer','nftTransferOverlay'],['closeGiftView','giftViewOverlay'],['closeProfile','profileOverlay'],
+   ['closeBadgePicker','badgePickerOverlay'],['closePremiumModal','premOverlay'],['closePaymentModal','payOverlay'],['closeCardModal','cardOverlay'],
+   ['closeSettings','settingsOverlay'],['closeContactProfile','contactProfileOverlay']].forEach(([fn, id]) => {
+    const orig = window[fn];
+    if (typeof orig !== 'function') return;
+    window[fn] = function () {
+      const ghost = ghostOf(id);
+      const r = orig.apply(this, arguments);
+      if (ghost && !ghost.o.classList.contains('open')) {
+        document.body.appendChild(ghost.g);
+        setTimeout(() => ghost.g.remove(), 240);
+      }
+      return r;
+    };
+  });
+
+  /* ── Волна при нажатии ── */
+  document.addEventListener('pointerdown', e => {
+    if (!motionOK()) return;
+    const host = e.target.closest && e.target.closest('.menu-item,.fab-menu-item,.mx-items button,.folder-tab,.st-row,.auth-btn');
+    if (!host) return;
+    host.classList.add('tg-ripple-host');
+    const r = host.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2.1;
+    const w = document.createElement('span');
+    w.className = 'tg-ripple';
+    w.style.cssText = 'width:' + d + 'px;height:' + d + 'px;left:' + (e.clientX - r.left - d / 2) + 'px;top:' + (e.clientY - r.top - d / 2) + 'px';
+    host.appendChild(w);
+    setTimeout(() => w.remove(), 520);
+  }, { passive: true });
+
+  /* ── Конфетти (один лёгкий canvas, сам удаляется) ── */
+  function confetti(x, y, opts) {
+    if (!motionOK()) return;
+    opts = opts || {};
+    const cv = document.createElement('canvas');
+    cv.className = 'tg-confetti';
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    document.body.appendChild(cv);
+    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+    const colors = opts.colors || ['#ffd54f', '#ff8a65', '#4fc3f7', '#81c784', '#ba68c8', '#ffffff', '#3390ec'];
+    const count = opts.count || (innerWidth < 700 ? 54 : 84);
+    const ps = Array.from({ length: count }, () => {
+      const a = Math.random() * Math.PI * 2, v = 3.5 + Math.random() * 8.5;
+      return { x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 3.5, s: 4 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .35,
+               c: colors[Math.floor(Math.random() * colors.length)], round: Math.random() < .35 };
+    });
+    const dur = opts.duration || 1500, t0 = performance.now();
+    (function frame(now) {
+      const t = (now - t0) / dur;
+      if (t >= 1) { cv.remove(); return; }
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      ctx.globalAlpha = t < .6 ? 1 : 1 - (t - .6) / .4;
+      for (const p of ps) {
+        p.vx *= .975; p.vy = p.vy * .975 + .17; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c;
+        if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.s / 2, 0, 7); ctx.fill(); }
+        else ctx.fillRect(-p.s / 2, -p.s / 3, p.s, p.s * .66);
+        ctx.restore();
+      }
+      requestAnimationFrame(frame);
+    })(t0);
+  }
+  window.tgConfetti = confetti;
+
+  /* ── Покупка подарка: подарок появляется, играет и улетает в чат ── */
+  window.showGiftBurst = function (gift, targetName, isSelf) {
+    if (!gift) return;
+    if (!motionOK()) return;
+    document.querySelectorAll('.tg-gift-fx').forEach(x => x.remove());
+    const fx = document.createElement('div');
+    fx.className = 'tg-gift-fx';
+    fx.innerHTML = '<div class="tg-gift-card"><div class="tg-gift-stage"><div class="tg-gift-anim tg-gift-still"></div><div class="tg-gift-anim tg-gift-live"></div></div>' +
+      '<div class="tg-gift-title">' + (isSelf ? 'Подарок ваш!' : 'Подарок отправлен!') + '</div>' +
+      '<div class="tg-gift-sub">' + _ntEsc(gift.name) + (isSelf ? '' : ' → ' + _ntEsc(targetName)) + '</div></div>';
+    document.body.appendChild(fx);
+    const stillEl = fx.querySelector('.tg-gift-still'), liveEl = fx.querySelector('.tg-gift-live'), card = fx.querySelector('.tg-gift-card');
+    let anim = null, closed = false, playing = false;
+    // Пока загружается анимация, показываем первый кадр; плеер сразу в DOM, чтобы холст получил размер
+    getGiftFrameSafe(gift.id, url => { if (url && !playing && stillEl.isConnected) stillEl.innerHTML = '<img src="' + url + '" alt="">'; });
+    ensureLottie(() => {
+      if (closed || !window.lottie) return;
+      anim = window.lottie.loadAnimation({ container: liveEl, renderer: 'canvas', loop: false, autoplay: true, path: '/gifts/' + gift.id + '.json' });
+      anim.addEventListener('DOMLoaded', () => { playing = true; stillEl.innerHTML = ''; });
+    });
+    setTimeout(() => {
+      if (closed) return;
+      const r = card.querySelector('.tg-gift-stage').getBoundingClientRect();
+      confetti(r.left + r.width / 2, r.top + r.height / 2);
+    }, 170);
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      clearTimeout(timer);
+      const bubbles = document.querySelectorAll('#msgsArea .gift-bubble');
+      const target = bubbles[bubbles.length - 1];
+      const from = card.getBoundingClientRect();
+      card.style.animation = 'none';
+      if (target && target.getBoundingClientRect().height) {
+        const to = target.getBoundingClientRect();
+        const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
+        card.animate([{ transform: 'none', opacity: 1 }, { transform: 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(.26)', opacity: .15 }],
+          { duration: 360, easing: 'cubic-bezier(.5,0,.2,1)', fill: 'forwards' });
+        target.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.07)', offset: .45 }, { transform: 'scale(1)' }], { duration: 420, delay: 250, easing: EASE });
+      } else {
+        card.animate([{ transform: 'none', opacity: 1 }, { transform: 'translate3d(0,-46px,0) scale(.86)', opacity: 0 }], { duration: 280, easing: EASE, fill: 'forwards' });
+      }
+      fx.classList.add('out');
+      setTimeout(() => { try { if (anim) anim.destroy(); } catch (e) {} fx.remove(); }, 370);
+    };
+    const timer = setTimeout(close, 2100);
+    fx.addEventListener('click', close);
+  };
+  function getGiftFrameSafe(model, cb) { ensureLottie(() => getGiftFrame(model).then(cb)); }
+
+  /* ── Улучшение в NFT ── */
+  window.tgNftReveal = function () {
+    if (!motionOK()) return;
+    const modal = document.getElementById('giftViewModal'), hero = document.getElementById('gvmHero');
+    if (!modal) return;
+    modal.classList.remove('gvm-reveal'); void modal.offsetWidth; modal.classList.add('gvm-reveal');
+    setTimeout(() => modal.classList.remove('gvm-reveal'), 760);
+    if (hero) {
+      if (getComputedStyle(hero).position === 'static') hero.style.position = 'relative';
+      const sh = document.createElement('div');
+      sh.className = 'tg-shine';
+      hero.appendChild(sh);
+      setTimeout(() => sh.remove(), 1200);
+      const r = hero.getBoundingClientRect();
+      setTimeout(() => confetti(r.left + r.width / 2, r.top + r.height * .45, { colors: ['#ffd700', '#ffb300', '#fff3c4', '#ffffff', '#b388ff'] }), 140);
+    }
+  };
+
+  /* ── Ежедневная награда ── */
+  const origReward = window.showRewardBurst;
+  window.showRewardBurst = function () {
+    const r = origReward.apply(this, arguments);
+    confetti(innerWidth / 2, innerHeight / 2, { colors: ['#ffd700', '#ffb300', '#ffe082', '#ffffff'], count: 60 });
+    return r;
+  };
+
+  /* ── Реакции: чип «выпрыгивает», эмодзи разлетаются ── */
+  const rowOf = id => document.querySelector('#msgsArea .msg-row[data-mid="' + CSS.escape(String(id)) + '"]');
+  const origReact = window.mxReact;
+  window.mxReact = function (c, m, emoji) {
+    const had = !!(m.reactions && (m.reactions[emoji] || []).includes(myUser && myUser.id));
+    const r = origReact.apply(this, arguments);
+    if (had || !motionOK()) return r;
+    const row = rowOf(m.id);
+    const chip = row && [...row.querySelectorAll('.mx-react')].find(b => b.dataset.emoji === emoji);
+    if (chip) {
+      chip.classList.add('pop');
+      const b = chip.getBoundingClientRect();
+      for (let i = 0; i < 7; i++) {
+        const f = document.createElement('span');
+        f.className = 'tg-float'; f.textContent = emoji;
+        f.style.left = (b.left + 10) + 'px'; f.style.top = (b.top + 4) + 'px';
+        document.body.appendChild(f);
+        const a = -Math.PI / 2 + (Math.random() - .5) * 1.9, d = 34 + Math.random() * 46;
+        f.animate([{ transform: 'scale(.5)', opacity: 1 }, { transform: 'translate3d(' + Math.cos(a) * d + 'px,' + Math.sin(a) * d + 'px,0) scale(1.15) rotate(' + (Math.random() * 50 - 25) + 'deg)', opacity: 0 }],
+          { duration: 520 + Math.random() * 180, easing: EASE }).onfinish = () => f.remove();
+      }
+    }
+    return r;
+  };
+
+  /* ── Удаление: сообщение схлопывается ── */
+  function collapse(row, done) {
+    if (!row || !motionOK()) { done(); return; }
+    const h = row.offsetHeight;
+    row.style.overflow = 'hidden';
+    const a = row.animate([{ height: h + 'px', opacity: 1, transform: 'none' }, { height: '0px', opacity: 0, transform: 'scale(.9)' }], { duration: 200, easing: EASE, fill: 'forwards' });
+    let ran = false;
+    const go = () => { if (!ran) { ran = true; done(); } };
+    a.onfinish = go;
+    setTimeout(go, 260);
+  }
+  const origDelete = window.mxDelete;
+  window.mxDelete = function (c, m) { collapse(activeId === c.id ? rowOf(m.id) : null, () => origDelete(c, m)); };
+  const origApply = window.mxApplyServer;
+  window.mxApplyServer = function (msg) {
+    if (msg.type === 'message_deleted' && activeId === msg.chatId) { collapse(rowOf(msg.msgId), () => origApply(msg)); return; }
+    origApply(msg);
+  };
+
+  /* ── Просмотр фото: вылет из сообщения и обратно, листание со сдвигом ── */
+  const origOpenPhoto = window.openPhotoViewer;
+  const flipFrom = r => {
+    const i = tgv.img.getBoundingClientRect();
+    if (!i.width || !r.width) return null;
+    return 'translate3d(' + (r.left + r.width / 2 - i.left - i.width / 2) + 'px,' + (r.top + r.height / 2 - i.top - i.height / 2) + 'px,0) scale(' + (r.width / i.width) + ')';
+  };
+  window.openPhotoViewer = function (imgId) {
+    const thumb = document.getElementById(imgId);
+    const rect = thumb && thumb.getBoundingClientRect();
+    const r = origOpenPhoto.apply(this, arguments);
+    if (rect && motionOK() && tgv.img) {
+      const run = () => { const from = flipFrom(rect); if (from) tgv.img.animate([{ transform: from }, { transform: 'none' }], { duration: 280, easing: EASE }); };
+      (tgv.img.decode ? tgv.img.decode().catch(() => {}) : Promise.resolve()).then(run);
+    }
+    return r;
+  };
+  const origCloseV = window.tgvClose;
+  window.tgvClose = function () {
+    if (tgv.el && !tgv.el.hidden && tgv.s === 1 && motionOK()) {
+      const m = tgv.list[tgv.i], thumb = m && document.getElementById('photo_' + m.id);
+      const rect = thumb && thumb.getBoundingClientRect();
+      if (rect && rect.width && rect.bottom > 0 && rect.top < innerHeight) {
+        const to = flipFrom(rect);
+        if (to) tgv.img.animate([{ transform: 'none' }, { transform: to }], { duration: 180, easing: EASE, fill: 'none' });
+      }
+    }
+    return origCloseV.apply(this, arguments);
+  };
+  const origGo = window.tgvGo;
+  window.tgvGo = function (d) {
+    const before = tgv.i;
+    const r = origGo.apply(this, arguments);
+    if (tgv.i !== before && motionOK()) tgv.img.animate([{ opacity: .2, transform: 'translate3d(' + (d * 70) + 'px,0,0)' }, { opacity: 1, transform: 'none' }], { duration: 230, easing: EASE });
+    return r;
+  };
+})();
 </script>
 </body>
 </html>

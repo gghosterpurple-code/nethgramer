@@ -1,0 +1,11 @@
+# Необязательно: нужен только при выкладке через консоль (npx wrangler deploy).
+# Через сайт Cloudflare этот файл не используется, см. README.md в этой папке.
+name = "nethgram-keepalive"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+TARGET_URL = "https://nethgram.onrender.com/healthz"
+
+[triggers]
+crons = ["*/14 * * * *"]
