@@ -3722,6 +3722,8 @@ function handleWS(msg) {
     case 'registered': {
       const wasAlreadyLoggedIn = !!myUser;
       myUser = msg.user;
+      // В Android-приложении получаем токен для фоновых уведомлений
+      if (window.__nethgramDevice) wsSend({ type: 'get_push_token', deviceId: window.__nethgramDevice });
       if (msg.user.isSuperUser !== undefined) isSuperUser = !!msg.user.isSuperUser;
       // Restore username from server (source of truth)
       // Username: server is source of truth, then localStorage fallback
@@ -4145,6 +4147,11 @@ function handleWS(msg) {
     }
 
     case 'message_sent': {
+      break;
+    }
+
+    case 'push_token': {
+      try { if (window.NethgramNative) NethgramNative.postMessage(JSON.stringify({ type: 'push_token', token: msg.token })); } catch (e) {}
       break;
     }
 
@@ -5108,6 +5115,10 @@ function stepPwd() {
 }
 
 function logout() {
+  if (window.__nethgramDevice) {
+    wsSend({ type: 'revoke_push_token', deviceId: window.__nethgramDevice });
+    try { if (window.NethgramNative) NethgramNative.postMessage(JSON.stringify({ type: 'push_logout' })); } catch (e) {}
+  }
   closeMenu();
   activeId = null;
   contacts.clear();
