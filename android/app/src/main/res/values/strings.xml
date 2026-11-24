@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nethgram</string>
+    <string name="error_title">Нет соединения</string>
+    <string name="error_text">Проверьте интернет. Приложение подключится само, как только сервер ответит.</string>
+    <string name="retry">Повторить</string>
+    <string name="saved">Фото сохранено в галерею</string>
+    <string name="save_failed">Не удалось сохранить фото</string>
+    <string name="save_denied">Нет разрешения на сохранение</string>
+    <string name="no_file_app">Нет приложения для выбора файлов</string>
+    <string name="channel_messages">Сообщения</string>
+    <string name="channel_service">Фоновая связь</string>
+    <string name="channel_service_desc">Нужна, чтобы сообщения приходили сразу. Этот значок можно скрыть в настройках.</string>
+    <string name="service_text">Получение новых сообщений</string>
+    <string name="new_messages">Новые сообщения</string>
+    <string name="you">Вы</string>
+</resources>

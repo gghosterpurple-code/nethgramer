@@ -1,0 +1,48 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.nethgram.app"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.nethgram.app"
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+
+        // Адрес мессенджера. Если сайт переедет, поменяйте только эту строку.
+        buildConfigField "String", "SERVER_URL", '"https://nethgram.onrender.com"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    androidResources {
+        // assets/emoji/ — неиспользуемый дубль эмодзи: в APK он не попадёт, даже если его скопировать
+        ignoreAssetsPattern "!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:<dir>emoji"
+    }
+}
+
+dependencies {
+    // единая версия Kotlin у всех библиотек, иначе сборка падает на дублях классов
+    implementation platform("org.jetbrains.kotlin:kotlin-bom:1.8.22")
+    implementation "androidx.activity:activity:1.9.3"
+    implementation "androidx.core:core:1.13.1"
+    implementation "androidx.webkit:webkit:1.12.1"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+}

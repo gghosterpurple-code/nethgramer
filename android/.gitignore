@@ -1,0 +1,19 @@
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+captures/
+.cxx/
+
+# Готовые сборки и ключи подписи в репозиторий не кладём
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties
+
+# Копия ассетов для APK: оригиналы лежат в static/
+app/src/main/assets/web/*
+!app/src/main/assets/web/.gitkeep
