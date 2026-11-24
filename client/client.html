@@ -2984,7 +2984,9 @@ html.dark .folder-ind{background:var(--accent)}
 #giftViewModal .gvm-desc b{font-weight:700}
 #giftViewModal .gvm-desc a{color:#5eb0ff;text-decoration:none}
 #giftViewModal .gvm-desc a:hover{text-decoration:underline}
+#giftViewModal .gvm-caption{margin-top:12px;padding:8px 12px;border-radius:8px;background:#1e2936;font-size:13px;line-height:18px;color:#fff;text-align:center;word-break:break-word;white-space:pre-wrap}
 #giftViewModal .gvm-body{padding:16px 24px 22px}
+.nt-msg{margin:8px 12px 0;padding:6px 10px;border-radius:10px;background:rgba(0,0,0,.22);color:#fff;font-size:13px;line-height:17px;text-align:center;word-break:break-word;white-space:pre-wrap}
 #giftViewModal .gvm-table{border:1px solid #2a3846;border-radius:8px;overflow:hidden}
 #giftViewModal .gvm-trow{display:flex;height:38px}
 #giftViewModal .gvm-trow+.gvm-trow{border-top:1px solid #2a3846}
@@ -7282,6 +7284,7 @@ function renderNftTransferBubble(msg, isOut, c) {
             ${d.nftModelName ? `<div><span>Модель</span> <b>${_ntEsc(d.nftModelName)}</b></div>` : ''}
             ${d.nftGradientName ? `<div><span>Фон</span> <b>${_ntEsc(d.nftGradientName)}</b></div>` : ''}
           </div>
+          ${d.message ? `<div class="nt-msg">${_ntEsc(d.message)}</div>` : ''}
           <div class="nt-btn">Посмотреть</div>
         </div>
       </div>`;
@@ -7302,7 +7305,7 @@ function openNftTransferMsg(msgId) {
   let entry = (receivedGifts[myUser?.id] || []).find(g => g.isNft && String(g.ts) === String(d.nftTs));
   if (!entry) entry = { giftId:d.giftId, giftName:d.giftName, giftPrice:d.giftPrice, isNft:true, ts:d.nftTs, nftModel:d.nftModel,
     nftModelName:d.nftModelName, nftGradient:d.nftGradient, nftGradientName:d.nftGradientName, nftTag:d.nftTag, nftNumber:d.nftNumber,
-    nftSerial:d.nftSerial, fromName:d.fromName, nftOwnerId:null };
+    nftSerial:d.nftSerial, fromName:d.fromName, msg:d.message || '', nftOwnerId:null };
   openGiftView(msgId, entry);
 }
 
@@ -7364,6 +7367,12 @@ function openGiftView(msgId, giftEntry, ctx) {
   } else {
     descEl.innerHTML = 'Подарок стоимостью <b>' + price.toLocaleString('ru-RU') + '</b> звёзд из коллекции Nethgram. ' + starsLink;
   }
+
+  // Подпись к подарку (если есть)
+  const capEl = document.getElementById('gvmCaption');
+  const capText = String(g.msg || g.message || '').trim();
+  capEl.textContent = capText;
+  capEl.style.display = capText ? '' : 'none';
 
   // Таблица: Дата / Стоимость (+ Модель / Фон для NFT)
   const when = Number((isNft && g.nftTs) || g.ts);
@@ -9814,6 +9823,7 @@ function closeContactProfile() {
       <div class="gvm-lottie" id="gvmLottie"></div>
       <div class="gvm-name" id="gvmName"></div>
       <div class="gvm-desc" id="gvmDesc"></div>
+      <div class="gvm-caption" id="gvmCaption" style="display:none"></div>
     </div>
     <div class="gvm-body">
       <div class="gvm-table">

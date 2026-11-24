@@ -1151,15 +1151,35 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
   // Если такой NFT уже есть у кого-то — копируются его модель и фон; если нет — модель и фон случайные.
   if (t === '/nft' || t.startsWith('/nft ')) {
     if (!isAdmin) return { text: '🔒 Нет доступа.' };
+    const NFT_USAGE = '⚠️ Использование: /nft #НазваниеНомер [модель] [фон] [подпись]\n\n' +
+      'Примеры:\n/nft #ScaredCat1\n/nft #SpyAgaric7 Shrek Black\n/nft #SpyAgaric7 Prime Night Gold Rush С днём рождения!\n\n' +
+      'Модель и фон можно пропустить знаком «-»: /nft #SpyAgaric7 - Black Привет';
     const raw = t.substring(4).trim().replace(/^#/, '');
-    const m = raw.match(/^(.+?)[\s#№-]*(\d+)$/);
-    if (!m) return { text: '⚠️ Использование: /nft #НазваниеНомер\n\nПример: /nft #ScaredCat1' };
+    // «#SpyAgaric7 модель фон подпись» или «spy agaric 7» (без доп. параметров)
+    const m = raw.match(/^(\S*?\D)(\d+)(?:\s+([\s\S]*))?$/) || raw.match(/^(.+?)[\s#№-]*(\d+)$/);
+    if (!m) return { text: NFT_USAGE };
     const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9а-яё]/g, '');
     const q = norm(m[1]);
     const num = parseInt(m[2], 10);
-    if (!q || !num || num < 1) return { text: '⚠️ Укажите название и номер, например: /nft #ScaredCat1' };
+    if (!q || !num || num < 1) return { text: NFT_USAGE };
     const def = GIFT_DEFS.find(d => norm(d.name) === q || norm(d.id) === q);
     if (!def) return { text: '❌ Подарок «' + m[1] + '» не найден.' };
+
+    // Хвост: [модель] [фон] [подпись]. Название берём по самому длинному совпадению слов (до 3).
+    let words = (m[3] || '').trim().split(/\s+/).filter(Boolean);
+    const takeNamed = list => {
+      if (words[0] === '-' || words[0] === '*') { words = words.slice(1); return null; }
+      for (let n = Math.min(3, words.length); n >= 1; n--) {
+        const key = norm(words.slice(0, n).join(''));
+        const hit = list.find(x => norm(x.name) === key || norm(x.id || '') === key);
+        if (hit) { words = words.slice(n); return hit; }
+      }
+      return null;
+    };
+    const giftModels = NFT_MODELS_BY_GIFT[def.id] || [{ id: def.id, name: def.name }];
+    const pickedModel = takeNamed(giftModels);
+    const pickedGradient = takeNamed(NFT_GRADIENTS);
+    const caption = words.join(' ').slice(0, 255);
 
     // Ищем существующий NFT с таким номером у всех пользователей и каналов
     let src = null;
@@ -1168,20 +1188,16 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
       src = (list || []).find(g => g.isNft && g.giftId === def.id && Number(g.nftNumber) === num);
       if (src) break;
     }
-    let model, gradient;
-    if (src) {
-      model = { id: src.nftModel, name: src.nftModelName };
-      gradient = { css: src.nftGradient, name: src.nftGradientName };
-    } else {
-      const models = NFT_MODELS_BY_GIFT[def.id] || [{ id: def.id, name: def.name }];
-      model = models[Math.floor(Math.random() * models.length)];
-      gradient = NFT_GRADIENTS[Math.floor(Math.random() * NFT_GRADIENTS.length)];
-    }
+    // Указанные вручную модель/фон важнее; иначе — как у существующего NFT; иначе — случайно
+    const model = pickedModel
+      || (src && src.nftModel ? { id: src.nftModel, name: src.nftModelName } : giftModels[Math.floor(Math.random() * giftModels.length)]);
+    const gradient = pickedGradient
+      || (src && src.nftGradient ? { css: src.nftGradient, name: src.nftGradientName } : NFT_GRADIENTS[Math.floor(Math.random() * NFT_GRADIENTS.length)]);
     if ((nftCounters.get(def.id) || 0) < num) nftCounters.set(def.id, num);
     const now = Date.now();
     const nft = {
       giftId: def.id, giftName: def.name, giftPrice: def.price,
-      fromId: 'bot_nethgram', fromName: 'Nethgram Bot', msg: '',
+      fromId: 'bot_nethgram', fromName: 'Nethgram Bot', msg: caption,
       ts: now, isNft: true,
       nftModel: model.id, nftModelName: model.name,
       nftGradient: gradient.css, nftGradientName: gradient.name,
@@ -1194,7 +1210,9 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     scheduleSave();
     return {
       text: '🎁 Отправлен NFT ' + def.name + ' ' + nft.nftTag + '\n' +
-        (src ? '♻️ Копия существующего: ' : '🎲 Новый, случайно: ') + 'модель ' + model.name + ', фон ' + gradient.name,
+        'Модель: ' + model.name + (pickedModel ? '' : src ? ' (как у существующего)' : ' (случайно)') + '\n' +
+        'Фон: ' + gradient.name + (pickedGradient ? '' : src ? ' (как у существующего)' : ' (случайно)') +
+        (caption ? '\nПодпись: ' + caption : ''),
       botNft: nft,
     };
   }
@@ -2541,7 +2559,7 @@ server.on('upgrade', (req, socket) => {
               const tData = { isNftTransfer:true, giftId:nft.giftId, giftName:nft.giftName, giftPrice:nft.giftPrice,
                 nftTs:nft.ts, nftTag:nft.nftTag, nftNumber:nft.nftNumber, nftSerial:nft.nftSerial, nftModel:nft.nftModel,
                 nftModelName:nft.nftModelName, nftGradient:nft.nftGradient, nftGradientName:nft.nftGradientName,
-                fromId:'bot_nethgram', fromName:'Nethgram Bot', toId:userId, toName:me ? me.name : '' };
+                fromId:'bot_nethgram', fromName:'Nethgram Bot', toId:userId, toName:me ? me.name : '', message: nft.msg || '' };
               const nMsg = botReply('bot_nethgram', JSON.stringify(tData));
               const nKey = chatKey(userId, 'bot_nethgram');
               if (!messages.has(nKey)) messages.set(nKey, []);
