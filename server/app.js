@@ -66,6 +66,7 @@ const fakeMembers    = new Map();
 const userStars      = new Map();
 const dailyRewards   = new Map();   // userId -> время последней ежедневной награды
 const UNLIMITED_STARS = 999999999;   // баланс-метка режима /unlimited
+const GIFT_SELL_RATE = 0.85;         // продажа подарка: 85% от цены (то же число в client.html)
 const DAILY_REWARD = 500, DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const premiumUsernames = new Map();
 const premiumUsers = new Set(); // у кого есть Nethgram Premium (выдаёт администратор: /premium @юзернейм)
@@ -142,6 +143,11 @@ const NFT_MODELS_BY_GIFT = {
     {id:'raphael',name:'Raphael'},{id:'red_pepple',name:'Red Pepple'},{id:'sketchy',name:'Sketchy'},
     {id:'spectrum',name:'Spectrum'},
   ],
+  spy_agaric: [
+    {id:'bleached',name:'Bleached'},{id:'emerald',name:'Emerald'},{id:'pepe',name:'Pepe'},
+    {id:'prime_night',name:'Prime Night'},{id:'rafa',name:'Rafa'},{id:'ruby',name:'Ruby'},
+    {id:'shrek',name:'Shrek'},
+  ],
 };
 
 const NFT_GRADIENTS = [
@@ -161,7 +167,7 @@ const NFT_GRADIENTS = [
   {name:'Toxic',      css:'linear-gradient(135deg,#56ab2f,#a8e063)'},
 ];
 
-const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard','candy_cane']);
+const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard','candy_cane','spy_agaric']);
 
 // ── VELO$IPE ECONOMY ──────────────────────────────────────────────
 // Игровая валюта внутри Nethgram. Не настоящая криптовалюта.
@@ -2628,6 +2634,28 @@ server.on('upgrade', (req, socket) => {
         if (!gi) break;
         gi.hidden = !!msg.hidden;
         scheduleSave();
+        break;
+      }
+
+      case 'sell_gift': {
+        // Продать свой обычный подарок (не NFT) за звёзды: GIFT_SELL_RATE от цены
+        if (!userId) break;
+        const sellFail = text => send({ type:'gift_sell_failed', text });
+        const own = userGifts.get(userId) || [];
+        const si = own.findIndex(g => String(g.ts) === String(msg.giftTs));
+        if (si === -1) { sellFail('Подарок не найден'); break; }
+        const sg = own[si];
+        if (sg.isNft) { sellFail('NFT нельзя продать'); break; }
+        const def = GIFT_DEFS.find(d => d.id === sg.giftId);
+        const basePrice = def ? def.price : (sg.giftPrice || 0);
+        const amount = Math.floor(basePrice * GIFT_SELL_RATE);
+        if (amount <= 0) { sellFail('Этот подарок нельзя продать'); break; }
+        own.splice(si, 1);
+        const bal = starsOf(userId);
+        if (bal < UNLIMITED_STARS) userStars.set(userId, bal + amount);
+        scheduleSave();
+        send({ type:'gift_sold', giftTs: sg.ts, amount, balance: starsOf(userId) });
+        send(starsSyncMsg(userId));
         break;
       }
 

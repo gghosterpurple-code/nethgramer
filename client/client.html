@@ -2973,6 +2973,36 @@ html.dark .folder-ind{background:var(--accent)}
 .tg-gift-sub{font-size:15px;opacity:.9;margin-top:3px;text-shadow:0 1px 6px rgba(0,0,0,.45);animation:tgBarUp .3s .26s var(--ease-out) both}
 .tg-confetti{position:fixed;inset:0;width:100vw;height:100vh;z-index:5000;pointer-events:none}
 .gvm-reveal{animation:tgNftReveal .7s var(--ease-spring) both!important}
+
+/* ── Окно подарка / NFT: тёмное, по эталону 364×461 ── */
+#giftViewModal{width:364px;max-width:calc(100vw - 32px);border-radius:8px;background:#161f2a;color:#fff;box-shadow:0 12px 48px rgba(0,0,0,.45);overflow:hidden}
+#giftViewModal .gvm-hero{padding:10px 24px 0;background:none!important;text-align:center;overflow:visible}
+#giftViewModal .gvm-lottie,#giftViewModal .gvm-nft-frame{width:120px;height:120px;margin:0 auto;border:0;box-shadow:none}
+#giftViewModal .gvm-nft-frame{border-radius:12px;background:var(--gvm-nft-bg,transparent);overflow:hidden}
+#giftViewModal .gvm-name{margin-top:16px;font-size:16px;font-weight:600;line-height:20px;color:#fff;text-shadow:none}
+#giftViewModal .gvm-desc{margin-top:21px;font-size:13px;line-height:18px;color:#fff;text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#giftViewModal .gvm-desc b{font-weight:700}
+#giftViewModal .gvm-desc a{color:#5eb0ff;text-decoration:none}
+#giftViewModal .gvm-desc a:hover{text-decoration:underline}
+#giftViewModal .gvm-body{padding:16px 24px 22px}
+#giftViewModal .gvm-table{border:1px solid #2a3846;border-radius:8px;overflow:hidden}
+#giftViewModal .gvm-trow{display:flex;height:38px}
+#giftViewModal .gvm-trow+.gvm-trow{border-top:1px solid #2a3846}
+#giftViewModal .gvm-tl{flex:0 0 92px;display:flex;align-items:center;padding-left:10px;background:#1e2936;border-right:1px solid #2a3846;font-size:12px;font-weight:600;color:#fff}
+#giftViewModal .gvm-tv{flex:1;min-width:0;display:flex;align-items:center;padding-left:13px;font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#giftViewModal .gvm-price{display:inline-flex;align-items:center;gap:4px}
+#giftViewModal .gvm-price img{width:16px;height:16px;object-fit:contain}
+#giftViewModal .gvm-sell{margin-left:8px;padding:2px 6px;border:0;border-radius:10px;background:#1a2a3b;color:#5eb0ff;font:inherit;font-size:12px;line-height:16px;cursor:pointer;white-space:nowrap}
+#giftViewModal .gvm-sell:hover{background:#21354a}
+#giftViewModal .gvm-sell:disabled{opacity:.6;cursor:default}
+#giftViewModal .gvm-bg-dot{width:12px;height:12px;border-radius:50%;margin-right:6px;flex:none}
+#giftViewModal .gvm-hint{font-size:13px;font-weight:400;line-height:18px;color:#6c7a89;text-align:center;margin-top:10px}
+#giftViewModal .gvm-hint+.gvm-hint{margin-top:18px}
+#giftViewModal .gvm-upgrade-btn,#giftViewModal .gvm-transfer-btn{width:calc(100% + 4px);margin:8px -2px 0;height:38px;padding:0;border:0;border-radius:4px;background:#1e2936;color:#5eb0ff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+#giftViewModal .gvm-upgrade-btn:hover,#giftViewModal .gvm-transfer-btn:hover{background:#24323f;opacity:1}
+#giftViewModal .gvm-ok-btn{display:block;width:calc(100% + 4px);height:42px;margin:17px -2px 0;border:0;border-radius:4px;background:#2e6fa8;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,transform .18s var(--ease-spring)}
+#giftViewModal .gvm-ok-btn:hover{background:#3479b6}
+#giftViewModal .gvm-ok-btn:active{transform:scale(.98)}
 @keyframes tgNftReveal{0%{transform:scale(.8) rotate(-2deg);filter:brightness(1.6)}60%{transform:scale(1.03) rotate(.5deg);filter:brightness(1.15)}100%{transform:none;filter:none}}
 .tg-shine{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
 .tg-shine::after{content:'';position:absolute;top:-30%;bottom:-30%;left:-60%;width:45%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-14deg);animation:tgShine .95s .12s var(--ease-out) forwards}
@@ -4299,6 +4329,13 @@ function handleWS(msg) {
       break;
     }
 
+    case 'gift_sold': { onGiftSold(msg); break; }
+    case 'gift_sell_failed': {
+      showToast('Ошибка', msg.text || 'Не удалось продать подарок', '⚠️', '#e74c3c');
+      const sb = document.getElementById('gvmSellBtn');
+      if (sb && giftViewCurrentGift) { sb.disabled = false; sb.textContent = 'продать за ' + giftSellValue(giftViewCurrentGift).toLocaleString('ru-RU') + ' звёзд'; }
+      break;
+    }
     case 'nft_upgraded': {
       // Server confirmed NFT upgrade — replace original gift with NFT version
       const upgraded = msg.gift;
@@ -7275,7 +7312,7 @@ let giftViewAnim = null;
 
 // ── NFT SYSTEM ──
 // Which gifts can be upgraded to NFT
-const NFT_UPGRADEABLE = new Set(['scared_cat', 'wine', 'plush_pepe', 'astral_shard', 'candy_cane']);
+const NFT_UPGRADEABLE = new Set(['scared_cat', 'wine', 'plush_pepe', 'astral_shard', 'candy_cane', 'spy_agaric']);
 
 let giftViewCurrentGift = null; // the gift entry currently shown in view modal
 
@@ -7306,65 +7343,62 @@ function openGiftView(msgId, giftEntry, ctx) {
 
   giftViewCurrentGift = g; // always set so action buttons can reference it
 
-  const hero   = document.getElementById('gvmHero');
   const nameEl = document.getElementById('gvmName');
-  const fromEl = document.getElementById('gvmFromLabel');
-
   const isNft = g.isNft === true;
+  const myList = (myUser && receivedGifts[myUser.id]) || [];
+  const mineEntry = (!giftViewChannelId && giftEntry && myUser)
+    ? myList.find(rg => String(rg.ts) === String(g.ts) && rg.giftId === g.giftId) : null;
 
-  // Hero background
-  if (isNft && g.nftGradient) {
-    hero.style.background = g.nftGradient;
-    nameEl.classList.add('gvm-nft-name');
-    fromEl.classList.add('gvm-nft-from');
-  } else {
-    hero.style.background = 'linear-gradient(160deg,#e8f5fe,#eef4ff,#f5f0ff)';
-    nameEl.classList.remove('gvm-nft-name');
-    fromEl.classList.remove('gvm-nft-from');
-  }
+  nameEl.textContent = isNft && g.nftTag ? (g.giftName || g.name || '') + ' ' + g.nftTag : (g.giftName || g.name || '');
 
-  nameEl.textContent = g.giftName || g.name || '';
-  fromEl.textContent = g.fromName ? 'От ' + g.fromName : '';
-  document.getElementById('gvmMsgBox').textContent = g.msg || g.message || 'Подарок без сообщения ✨';
-  document.getElementById('gvmPrice').innerHTML = '<img src="' + STAR_IMG + '"> ' + (g.giftPrice||0).toLocaleString();
-
-  const remaining = giftStock[g.giftId];
-  const giftDef = GIFTS.find(x => x.id === g.giftId);
-  const stockRow = document.getElementById('gvmStockRow');
-  if (!isNft) {
-    stockRow.style.display = '';
-    if (giftDef && !giftDef.limited) {
-      document.getElementById('gvmStock').textContent = '∞';
-    } else {
-      document.getElementById('gvmStock').textContent = remaining !== null ? remaining.toLocaleString()+' шт.' : '∞';
-    }
-  } else {
-    stockRow.style.display = 'none';
-  }
-
-  // NFT extras
-  const nftExtras = document.getElementById('gvmNftExtras');
+  // Описание (2 строки)
+  const price = g.giftPrice || 0;
+  const sellVal = giftSellValue(g);
+  const starsLink = '<a href="#" onclick="event.preventDefault();closeGiftView();openStars()">Подробнее о звёздах</a>';
+  const descEl = document.getElementById('gvmDesc');
   if (isNft) {
-    nftExtras.style.display = '';
-    document.getElementById('gvmNftSerial').textContent = g.nftSerial || '';
-    const tagsEl = document.getElementById('gvmNftTags');
-    tagsEl.innerHTML = '';
-    if (g.nftTag)          tagsEl.innerHTML += '<span class="gvm-nft-tag" style="background:rgba(255,215,0,.25);border-color:rgba(255,215,0,.5);font-size:12px;font-weight:800">' + g.nftTag + '</span>';
-    if (g.nftModelName)    tagsEl.innerHTML += '<span class="gvm-nft-tag">🎨 ' + g.nftModelName + '</span>';
-    if (g.nftGradientName) tagsEl.innerHTML += '<span class="gvm-nft-tag">🌈 ' + g.nftGradientName + '</span>';
+    descEl.innerHTML = 'Коллекционный подарок' + (g.nftNumber ? ' <b>№' + Number(g.nftNumber).toLocaleString('ru-RU') + '</b>' : '') +
+      '. Его можно носить, передать или показать в профиле. ' + starsLink;
+  } else if (mineEntry) {
+    descEl.innerHTML = 'Вы можете оставить этот подарок в профиле или продать его за <b>' + sellVal.toLocaleString('ru-RU') + '</b> звёзд. ' + starsLink;
   } else {
-    nftExtras.style.display = 'none';
+    descEl.innerHTML = 'Подарок стоимостью <b>' + price.toLocaleString('ru-RU') + '</b> звёзд из коллекции Nethgram. ' + starsLink;
   }
 
-  // Sparkles
-  const sp = document.getElementById('gvmSparkles');
-  const emojis = isNft ? ['💎','✨','⭐','🌟','💫'] : ['✨','⭐','🌟','💫','✦','🎁'];
-  sp.innerHTML = Array.from({length:14},(_,i)=>{
-    const e = emojis[i%emojis.length];
-    const l=Math.random()*100,t=Math.random()*100;
-    const delay=Math.random()*3,dur=2+Math.random()*2;
-    return '<span style="left:'+l+'%;top:'+t+'%;animation-delay:'+delay+'s;animation-duration:'+dur+'s">'+e+'</span>';
-  }).join('');
+  // Таблица: Дата / Стоимость (+ Модель / Фон для NFT)
+  const when = Number((isNft && g.nftTs) || g.ts);
+  document.getElementById('gvmDate').textContent = when
+    ? new Date(when).toLocaleString('ru-RU', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    : '—';
+  document.getElementById('gvmPrice').innerHTML = '<img src="' + STAR_IMG + '"> ' + price.toLocaleString('ru-RU');
+  const sellBtn = document.getElementById('gvmSellBtn');
+  if (mineEntry && !isNft && sellVal > 0) {
+    sellBtn.style.display = '';
+    sellBtn.disabled = false;
+    sellBtn.textContent = 'продать за ' + sellVal.toLocaleString('ru-RU') + ' звёзд';
+  } else {
+    sellBtn.style.display = 'none';
+  }
+  document.getElementById('gvmModelRow').style.display = isNft && g.nftModelName ? '' : 'none';
+  document.getElementById('gvmBgRow').style.display = isNft && g.nftGradientName ? '' : 'none';
+  document.getElementById('gvmModel').textContent = g.nftModelName || '';
+  const bgEl = document.getElementById('gvmBg');
+  bgEl.innerHTML = '';
+  if (isNft && g.nftGradientName) {
+    const dot = document.createElement('span');
+    dot.className = 'gvm-bg-dot';
+    dot.style.background = g.nftGradient || '#2e6fa8';
+    bgEl.append(dot, document.createTextNode(g.nftGradientName));
+  }
+
+  // Подсказки — только владельцу
+  document.getElementById('gvmHintHidden').style.display = mineEntry && mineEntry.hidden ? '' : 'none';
+  document.getElementById('gvmHintSender').style.display = mineEntry && g.fromName ? '' : 'none';
+
+  // NFT: стикер в рамке с фоном NFT
+  const hero = document.getElementById('gvmHero');
+  hero.classList.toggle('is-nft', isNft);
+  hero.style.setProperty('--gvm-nft-bg', isNft && g.nftGradient ? g.nftGradient : 'transparent');
 
   // Action buttons — only show for own gifts
   const upgradeBtn  = document.getElementById('gvmUpgradeBtn');
@@ -7489,6 +7523,8 @@ function toggleGiftHidden() {
   wsSend({ type: 'toggle_gift_hidden', giftTs: g.ts, hidden: entry.hidden });
   const btn = document.getElementById('gvmHideBtn');
   if (btn) btn.innerHTML = entry.hidden ? svgIc('eye',18) + ' Показать в профиле' : svgIc('eyeOff',18) + ' Скрыть из профиля';
+  const hh = document.getElementById('gvmHintHidden');
+  if (hh) hh.style.display = entry.hidden ? '' : 'none';
   showToast('Подарки', entry.hidden ? 'Подарок скрыт из профиля' : 'Подарок снова виден в профиле', entry.hidden ? '🙈' : '👁');
   const gw = document.getElementById('profileGiftsWrap');
   if (gw && document.getElementById('profileOverlay')?.classList.contains('open')) {
@@ -7885,6 +7921,36 @@ function closeGiftView() {
   if (giftViewAnim) { try{giftViewAnim.destroy();}catch(e){} giftViewAnim=null; }
   giftViewCurrentGift = null;
   giftViewChannelId = null;
+}
+
+// ── ПРОДАЖА ПОДАРКА ЗА ЗВЁЗДЫ (только обычные подарки, не NFT) ──
+const GIFT_SELL_RATE = 0.85; // должно совпадать с сервером
+function giftSellValue(g) { return Math.floor((g && g.giftPrice || 0) * GIFT_SELL_RATE); }
+function sellGiftForStars() {
+  const g = giftViewCurrentGift;
+  if (!g || g.isNft || giftViewChannelId || !myUser) return;
+  const val = giftSellValue(g);
+  if (!confirm('Продать «' + (g.giftName || 'подарок') + '» за ' + val.toLocaleString('ru-RU') + ' звёзд?\nПодарок исчезнет из профиля.')) return;
+  const btn = document.getElementById('gvmSellBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'продаём…'; }
+  wsSend({ type: 'sell_gift', giftTs: g.ts });
+}
+function onGiftSold(msg) {
+  const uid = myUser?.id;
+  if (!uid) return;
+  receivedGifts[uid] = (receivedGifts[uid] || []).filter(rg => String(rg.ts) !== String(msg.giftTs));
+  if (typeof msg.balance === 'number') {
+    starBalance = msg.balance;
+    isStarsUnlimited = msg.balance >= 999_999_999;
+    updateStarsUI();
+  }
+  if (giftViewCurrentGift && String(giftViewCurrentGift.ts) === String(msg.giftTs)) closeGiftView();
+  showToast('Подарки', 'Подарок продан: +' + (msg.amount || 0).toLocaleString('ru-RU') + ' звёзд', '⭐');
+  const gw = document.getElementById('profileGiftsWrap');
+  if (gw && document.getElementById('profileOverlay')?.classList.contains('open')) {
+    gw.innerHTML = '';
+    ensureLottie(() => renderProfileGifts(uid, gw));
+  }
 }
 
 // ── NFT UPGRADE ──
@@ -9745,27 +9811,19 @@ function closeContactProfile() {
 <div class="gift-view-overlay" id="giftViewOverlay" onclick="handleGiftViewBackdrop(event)">
   <div class="gift-view-modal" id="giftViewModal">
     <div class="gvm-hero" id="gvmHero">
-      <button class="gvm-close" onclick="closeGiftView()" aria-label="Закрыть"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-      <div class="gvm-sparkles" id="gvmSparkles"></div>
       <div class="gvm-lottie" id="gvmLottie"></div>
       <div class="gvm-name" id="gvmName"></div>
-      <div class="gvm-from-label" id="gvmFromLabel"></div>
-      <!-- NFT extras (shown when isNft) -->
-      <div id="gvmNftExtras" style="display:none">
-        <div class="gvm-nft-serial" id="gvmNftSerial"></div>
-        <div class="gvm-nft-tags" id="gvmNftTags"></div>
-      </div>
+      <div class="gvm-desc" id="gvmDesc"></div>
     </div>
     <div class="gvm-body">
-      <div class="gvm-msg-box" id="gvmMsgBox"></div>
-      <div class="gvm-info-row">
-        <span class="gvm-info-label">Стоимость</span>
-        <span class="gvm-info-val" id="gvmPrice"></span>
+      <div class="gvm-table">
+        <div class="gvm-trow"><div class="gvm-tl">Дата</div><div class="gvm-tv" id="gvmDate"></div></div>
+        <div class="gvm-trow"><div class="gvm-tl">Стоимость</div><div class="gvm-tv"><span class="gvm-price" id="gvmPrice"></span><button class="gvm-sell" id="gvmSellBtn" style="display:none" onclick="sellGiftForStars()"></button></div></div>
+        <div class="gvm-trow" id="gvmModelRow" style="display:none"><div class="gvm-tl">Модель</div><div class="gvm-tv" id="gvmModel"></div></div>
+        <div class="gvm-trow" id="gvmBgRow" style="display:none"><div class="gvm-tl">Фон</div><div class="gvm-tv" id="gvmBg"></div></div>
       </div>
-      <div class="gvm-info-row" id="gvmStockRow">
-        <span class="gvm-info-label">Доступно</span>
-        <span class="gvm-info-val" id="gvmStock"></span>
-      </div>
+      <div class="gvm-hint" id="gvmHintHidden" style="display:none">Этот подарок скрыт. Видите его только вы.</div>
+      <div class="gvm-hint" id="gvmHintSender" style="display:none">Имя отправителя видно только вам.</div>
       <!-- Action buttons (shown contextually) -->
       <button class="gvm-upgrade-btn" id="gvmUpgradeBtn" style="display:none" onclick="upgradeGiftToNft()">
         <svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5l1.8 5.2L18 10.5l-5.2 1.8L11 17.5l-1.8-5.2L4 10.5l5.2-1.8z"/><path d="M18.5 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg> Превратить в NFT
@@ -9779,6 +9837,7 @@ function closeContactProfile() {
       <button class="gvm-transfer-btn" id="gvmHideBtn" style="display:none" onclick="toggleGiftHidden()">
         <svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg> Скрыть из профиля
       </button>
+      <button class="gvm-ok-btn" onclick="closeGiftView()">Закрыть</button>
     </div>
   </div>
 </div>
