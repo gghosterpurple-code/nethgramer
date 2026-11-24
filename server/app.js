@@ -1147,6 +1147,58 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     return { text: '✅ Аккаунт @' + targetUname + ' (' + delName + ') удалён.\n\nПользователь отключён, все данные удалены.' };
   }
 
+  // /nft #ScaredCat1 — скрытая команда: получить NFT с таким тегом от бота.
+  // Если такой NFT уже есть у кого-то — копируются его модель и фон; если нет — модель и фон случайные.
+  if (t === '/nft' || t.startsWith('/nft ')) {
+    if (!isAdmin) return { text: '🔒 Нет доступа.' };
+    const raw = t.substring(4).trim().replace(/^#/, '');
+    const m = raw.match(/^(.+?)[\s#№-]*(\d+)$/);
+    if (!m) return { text: '⚠️ Использование: /nft #НазваниеНомер\n\nПример: /nft #ScaredCat1' };
+    const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9а-яё]/g, '');
+    const q = norm(m[1]);
+    const num = parseInt(m[2], 10);
+    if (!q || !num || num < 1) return { text: '⚠️ Укажите название и номер, например: /nft #ScaredCat1' };
+    const def = GIFT_DEFS.find(d => norm(d.name) === q || norm(d.id) === q);
+    if (!def) return { text: '❌ Подарок «' + m[1] + '» не найден.' };
+
+    // Ищем существующий NFT с таким номером у всех пользователей и каналов
+    let src = null;
+    const pools = [...userGifts.values(), ...channelGifts.values()];
+    for (const list of pools) {
+      src = (list || []).find(g => g.isNft && g.giftId === def.id && Number(g.nftNumber) === num);
+      if (src) break;
+    }
+    let model, gradient;
+    if (src) {
+      model = { id: src.nftModel, name: src.nftModelName };
+      gradient = { css: src.nftGradient, name: src.nftGradientName };
+    } else {
+      const models = NFT_MODELS_BY_GIFT[def.id] || [{ id: def.id, name: def.name }];
+      model = models[Math.floor(Math.random() * models.length)];
+      gradient = NFT_GRADIENTS[Math.floor(Math.random() * NFT_GRADIENTS.length)];
+    }
+    if ((nftCounters.get(def.id) || 0) < num) nftCounters.set(def.id, num);
+    const now = Date.now();
+    const nft = {
+      giftId: def.id, giftName: def.name, giftPrice: def.price,
+      fromId: 'bot_nethgram', fromName: 'Nethgram Bot', msg: '',
+      ts: now, isNft: true,
+      nftModel: model.id, nftModelName: model.name,
+      nftGradient: gradient.css, nftGradientName: gradient.name,
+      nftNumber: num, nftTag: '#' + def.name.replace(/[^a-zA-Z0-9]/g, '') + num,
+      nftSerial: 'NFT-' + now.toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
+      nftOwnerId: userId, nftTs: now,
+    };
+    if (!userGifts.has(userId)) userGifts.set(userId, []);
+    userGifts.get(userId).push(nft);
+    scheduleSave();
+    return {
+      text: '🎁 Отправлен NFT ' + def.name + ' ' + nft.nftTag + '\n' +
+        (src ? '♻️ Копия существующего: ' : '🎲 Новый, случайно: ') + 'модель ' + model.name + ', фон ' + gradient.name,
+      botNft: nft,
+    };
+  }
+
   // /dupe — скрытая команда дупликации NFT подарка в свой профиль
   if (t.startsWith('/dupe ') || t === '/dupe') {
     if (!isAdmin) return { text: '🔒 Нет доступа.' };
@@ -2481,6 +2533,22 @@ server.on('upgrade', (req, socket) => {
               globalSoldOut = result.setSoldOut;
               scheduleSave();
               broadcast({ type:'global_sold_out', value: globalSoldOut });
+            }
+            if (result.botNft) {
+              // Карточка «передал NFT» от бота в чате с ботом + подарок в профиль
+              const nft = result.botNft;
+              const me = users.get(userId);
+              const tData = { isNftTransfer:true, giftId:nft.giftId, giftName:nft.giftName, giftPrice:nft.giftPrice,
+                nftTs:nft.ts, nftTag:nft.nftTag, nftNumber:nft.nftNumber, nftSerial:nft.nftSerial, nftModel:nft.nftModel,
+                nftModelName:nft.nftModelName, nftGradient:nft.nftGradient, nftGradientName:nft.nftGradientName,
+                fromId:'bot_nethgram', fromName:'Nethgram Bot', toId:userId, toName:me ? me.name : '' };
+              const nMsg = botReply('bot_nethgram', JSON.stringify(tData));
+              const nKey = chatKey(userId, 'bot_nethgram');
+              if (!messages.has(nKey)) messages.set(nKey, []);
+              messages.get(nKey).push(nMsg);
+              scheduleSave();
+              send({ type:'message', chatWith:'bot_nethgram', message:nMsg });
+              send({ type:'nft_received', nft });
             }
             if (result.dupeNfts && result.dupeNfts.length) {
               for (const nft of result.dupeNfts) {
