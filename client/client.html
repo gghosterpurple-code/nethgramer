@@ -2729,7 +2729,9 @@ html.dark .ctick{color:var(--accent)}
 /* Пузыри */
 .out .bubble{background:var(--msg-out)}
 .bname{font-size:14px;font-weight:500;line-height:1.25;margin-bottom:2px}
+.typing .tdots{display:inline-block;width:1em;vertical-align:bottom}
 .typing .tdots::after{content:'…';animation:tgDots 1.2s steps(4) infinite;display:inline-block;width:1em;overflow:hidden;vertical-align:bottom}
+#typingRow.typing-out{overflow:hidden;opacity:0;transition:height .24s var(--ease-out,ease-out),margin .24s var(--ease-out,ease-out),padding .24s var(--ease-out,ease-out),opacity .18s ease-out}
 @keyframes tgDots{0%{width:0}100%{width:1em}}
 .hdr-status.typing{color:var(--accent)}
 
@@ -2980,13 +2982,56 @@ html.dark .folder-ind{background:var(--accent)}
 @media (max-width:700px){
   .sidebar{transition:transform .3s var(--ease-out)}
   body.mob-chat .sidebar{transform:translate3d(-22%,0,0)}
-  .chat-main{z-index:101;transform:translate3d(100%,0,0);transition:transform .3s var(--ease-out);box-shadow:-6px 0 22px rgba(0,0,0,.16)}
-  body.mob-chat .chat-main{transform:none}
+  .chat-main{z-index:101;transform:translate3d(100%,0,0);transition:transform .3s var(--ease-out),box-shadow .3s}
+  body.mob-chat .chat-main{transform:none;box-shadow:-6px 0 22px rgba(0,0,0,.16)}
   .msgs-area.chat-enter{animation:none}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* ═════════ Сенсорные экраны: без подсветки линий и «залипшего» выделения ═════════ */
+*{-webkit-tap-highlight-color:transparent}
+.chat-item:hover .cmeta,.chat-item:active .cmeta,.chat-item.active .cmeta,
+.chat-item:hover+.chat-item .cmeta,.chat-item:active+.chat-item .cmeta,.chat-item.active+.chat-item .cmeta{box-shadow:none!important}
+.profile-row:active,.cp-row:active,.st-row:active,.ch-member-row:active,.user-found:active,.channel-found:active,.nft-transfer-user:active,.prem-feature-row:active{border-bottom-color:transparent}
+@media (hover:none){
+  /* на телефоне :hover остаётся после касания — убираем его у строк списков */
+  .chat-item:hover,html.dark .chat-item:hover,.menu-item:hover,html.dark .menu-item:hover,.st-row:hover,.user-found:hover,.channel-found:hover,
+  .member-list-item:hover,.ch-member-row:hover,.profile-row:hover,html.dark .profile-row:hover,.fab-menu-item:hover,html.dark .fab-menu-item:hover,.cmd-item:hover,.mx-fwd-item:hover,.mx-items button:hover,.folder-tab:hover{background:transparent}
+  .chat-item:hover .cmeta,.chat-item:hover+.chat-item .cmeta{box-shadow:0 -1px 0 var(--border)!important}
+  .chat-item:first-child:hover .cmeta{box-shadow:none!important}
+  .chat-item:active,html.dark .chat-item:active,.menu-item:active,html.dark .menu-item:active,.st-row:active,.user-found:active,.channel-found:active,
+  .member-list-item:active,.ch-member-row:active,.profile-row:active,.fab-menu-item:active,.cmd-item:active,.mx-fwd-item:active,.mx-items button:active{background:var(--press)}
+  .chat-item:active .cmeta,.chat-item:active+.chat-item .cmeta{box-shadow:none!important}
+}
+@media (max-width:700px){
+  /* на телефоне открытый чат не остаётся синей строкой в списке */
+  .chat-item.active,html.dark .chat-item.active,.chat-item.active:hover{background:transparent!important}
+  .chat-item.active:active,html.dark .chat-item.active:active{background:var(--press)!important}
+  .chat-item.active .cname{color:var(--list-name)!important}
+  .chat-item.active .ctime,.chat-item.active .cprev,.chat-item.active .cprev span{color:var(--list-prev)!important}
+  .chat-item.active .ctick{color:#4fae4e!important}
+  html.dark .chat-item.active .ctick{color:var(--accent)!important}
+  .chat-item.active .unread{background:var(--tg-blue);color:#fff}
+  .chat-item.active+.chat-item .cmeta,.chat-item.active .cmeta{box-shadow:0 -1px 0 var(--border)!important}
+  .chat-item.active:active .cmeta,.chat-item.active:active+.chat-item .cmeta{box-shadow:none!important}
+  .chat-item:first-child .cmeta{box-shadow:none!important}
+}
+/* нажатая строка важнее всех правил выше: линий вокруг неё нет */
+.chats-list .chat-item.chat-item:active .cmeta,.chats-list .chat-item.chat-item:active+.chat-item .cmeta{box-shadow:none!important}
+
+/* ═════════ Частная группа: переключатель при создании ═════════ */
+.create-private{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:10px 12px;border-radius:var(--r);background:var(--bg2);cursor:pointer}
+.create-private .cp-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.create-private b{font-size:15px;font-weight:500;color:var(--text)}
+.create-private small{font-size:12px;line-height:1.3;color:var(--text2)}
+.create-private input{position:absolute;opacity:0;width:0;height:0}
+.create-private .cp-sw{position:relative;flex-shrink:0;width:40px;height:24px;border-radius:12px;background:#c4c9cc;transition:background .18s}
+.create-private .cp-sw::after{content:'';position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .2s var(--ease-spring)}
+.create-private input:checked+.cp-sw{background:var(--tg-blue)}
+.create-private input:checked+.cp-sw::after{transform:translateX(16px)}
+.create-private input:focus-visible+.cp-sw{outline:2px solid var(--tg-blue);outline-offset:2px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
 </head>
@@ -3133,7 +3178,12 @@ html.dark .folder-ind{background:var(--accent)}
           <input type="text" id="createName" placeholder="Введите название" maxlength="64" oninput="validateCreateForm()">
           <div class="error" id="createNameErr">Введите название</div>
         </div>
-        <div class="create-field">
+        <label class="create-private" id="createPrivateRow" style="display:none">
+          <span class="cp-txt"><b>Частная группа</b><small>Без юзернейма, не видна в поиске. Попасть можно, только если добавит владелец или админ.</small></span>
+          <input type="checkbox" id="createPrivate" onchange="updateCreateModalUI()">
+          <span class="cp-sw"></span>
+        </label>
+        <div class="create-field" id="createUsernameField">
           <label>ЮЗЕРНЕЙМ</label>
           <input type="text" id="createUsername" placeholder="@username" maxlength="32" oninput="formatCreateUsername(this)">
           <div class="hint">Латинские буквы, цифры и _ · Уникальный среди всех</div>
@@ -3423,9 +3473,19 @@ function wireComposer(ta, inpArea, sendBtn, onSend) {
   ta.addEventListener('input', syncSend);
   ta.addEventListener('keydown', () => setTimeout(syncSend, 0));
   const t = setInterval(() => { if (!ta.isConnected) clearInterval(t); else syncSend(); }, 250);
+  // Иначе браузер убирает фокус с поля и клавиатура на телефоне сворачивается
+  let keepKeyboard = false;
+  sendBtn.addEventListener('mousedown', e => {
+    keepKeyboard = document.activeElement === ta;
+    if (keepKeyboard) e.preventDefault();
+  });
   sendBtn.addEventListener('click', () => {
     if (!ta.value.trim()) { showToast('Nethgram', 'Голосовые сообщения пока недоступны', 'logo'); return; }
-    onSend(); setTimeout(syncSend, 0);
+    const refocus = keepKeyboard || document.activeElement === ta;
+    keepKeyboard = false;
+    onSend();
+    if (refocus) ta.focus();
+    setTimeout(syncSend, 0);
   });
   syncSend();
 }
@@ -3816,12 +3876,13 @@ function handleWS(msg) {
             online: false, description: ch.description || '',
             ownerId: ch.ownerId || null,
               admins: ch.admins || [],
-            verifiedOrg: ch.verifiedOrg || null,
+            verifiedOrg: ch.verifiedOrg || null, isPrivate: !!ch.isPrivate,
           });
         } else {
           existing.name = ch.name;
           existing.username = ch.username;
           if (ch.verifiedOrg !== undefined) existing.verifiedOrg = ch.verifiedOrg || null;
+          if (ch.isPrivate !== undefined) existing.isPrivate = !!ch.isPrivate;
           existing.isChannel = ch.type === 'channel';
           existing.subscribers = ch.subscribers || existing.subscribers || 0;
           existing.description = ch.description || existing.description || '';
@@ -3866,7 +3927,7 @@ function handleWS(msg) {
             online: false, description: ch.description || '',
             ownerId: ch.ownerId || null,
               admins: ch.admins || [],
-            verifiedOrg: ch.verifiedOrg || null,
+            verifiedOrg: ch.verifiedOrg || null, isPrivate: !!ch.isPrivate,
           });
         } else {
           existing.subscribers = ch.subscribers;
@@ -3875,6 +3936,7 @@ function handleWS(msg) {
           existing.initials = ch.initials;
           existing.avatarUrl = normalizeAvatarUrl(ch.avatarUrl) || existing.avatarUrl || null;
           if (ch.verifiedOrg !== undefined) existing.verifiedOrg = ch.verifiedOrg || null;
+          if (ch.isPrivate !== undefined) existing.isPrivate = !!ch.isPrivate;
           existing.ownerId = ch.ownerId || existing.ownerId;
         }
         const c = contacts.get(ch.id);
@@ -4547,7 +4609,7 @@ function handleWS(msg) {
     }
 
     case 'velosipe_market': case 'velosipe_trade_ok': case 'velosipe_error':
-    case 'velosipe_history': case 'velosipe_tick': case 'market_news':
+    case 'velosipe_history': case 'velosipe_tick': case 'velosipe_limit': case 'market_news':
       vlpHandle(msg); break;
 
     case 'stars_unlim': {
@@ -4616,6 +4678,7 @@ function handleWS(msg) {
         if (upd.color)    c.color    = upd.color;
         if (upd.initials) c.initials = upd.initials;
         if ('verifiedOrg' in upd) c.verifiedOrg = upd.verifiedOrg || null;
+        if ('isPrivate' in upd) c.isPrivate = !!upd.isPrivate;
         renderChats();
         if (activeId === upd.id) openChannelChat(c);
       }
@@ -4685,8 +4748,9 @@ function handleWS(msg) {
       if (msg.ok) {
         const newCh = msg.channel;
         addCreatedChatToList(newCh.id, newCh.name, newCh.username, newCh.type, newCh.initials, newCh.subscribers, newCh.ownerId);
-        const label = newCh.type === 'channel' ? 'Канал' : 'Группа';
-        showToast('Nethgram', `${label} «${newCh.name}» создан!`, 'logo', null, newCh.id);
+        if (contacts.has(newCh.id)) contacts.get(newCh.id).isPrivate = !!newCh.isPrivate;
+        const label = newCh.type === 'channel' ? 'Канал' : (newCh.isPrivate ? 'Частная группа' : 'Группа');
+        showToast('Nethgram', `${label} «${newCh.name}» ${newCh.type === 'channel' ? 'создан' : 'создана'}!`, 'logo', null, newCh.id);
         // Open the new channel/group immediately
         setTimeout(() => openChat(newCh.id), 300);
       } else {
@@ -4812,7 +4876,7 @@ function handleWS(msg) {
           subscribers: ch.subscribers || 0,
           messages: existing?.messages || [], lastMsg: '', time: '', unread: 0,
           color: ch.color, initials: ch.initials, online: false, description: '',
-          ownerId: ch.ownerId || null, verifiedOrg: ch.verifiedOrg || null,
+          ownerId: ch.ownerId || null, verifiedOrg: ch.verifiedOrg || null, isPrivate: !!ch.isPrivate,
         });
       } else {
         // Update subscriber count in case it changed
@@ -4848,7 +4912,7 @@ function handleWS(msg) {
           subscribers: ch.subscribers || 0,
           messages: existing?.messages || [], lastMsg: '', time: '', unread: 0,
           color: ch.color, initials: ch.initials, online: false, description: '',
-          ownerId: ch.ownerId || null, verifiedOrg: ch.verifiedOrg || null,
+          ownerId: ch.ownerId || null, verifiedOrg: ch.verifiedOrg || null, isPrivate: !!ch.isPrivate,
         });
       } else {
         existing.subscribers = ch.subscribers || existing.subscribers;
@@ -5457,9 +5521,21 @@ function doSend(c) {
 let typingTimer = null;
 function showTypingIndicator(c) {
   if (!c) return;
-  removeTyping();
   const area = document.getElementById('msgsArea');
   if (!area) return;
+  // Индикатор уже показан: только продлеваем таймер, без пересоздания (иначе экран дёргается)
+  const existing = document.getElementById('typingRow');
+  if (existing && existing.parentNode === area) {
+    if (existing.classList.contains('typing-out')) {
+      existing.classList.remove('typing-out');
+      existing.style.height = existing.style.marginTop = existing.style.marginBottom = existing.style.paddingTop = existing.style.paddingBottom = '';
+    }
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => removeTyping(true), 3000);
+    return;
+  }
+  removeTyping();
+  const nearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 80;
   const row = document.createElement('div');
   row.className = 'msg-row in';
   row.id = 'typingRow';
@@ -5470,16 +5546,31 @@ function showTypingIndicator(c) {
     <div class="bubble typing-bub"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>
   `;
   area.appendChild(row);
-  area.scrollTop = area.scrollHeight;
+  if (nearBottom) {
+    try { area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' }); } catch (_) { area.scrollTop = area.scrollHeight; }
+  }
   const st = document.querySelector('#chatHdr .hdr-status');
   if (st && !st.classList.contains('typing')) { st.dataset.orig = st.innerHTML; st.innerHTML = 'печатает<span class="tdots"></span>'; st.classList.add('typing'); }
   clearTimeout(typingTimer);
-  typingTimer = setTimeout(removeTyping, 3000);
+  typingTimer = setTimeout(() => removeTyping(true), 3000);
 }
 
-function removeTyping() {
+// animated=true — плавно схлопнуть строку «печатает» (по таймеру);
+// без аргумента — убрать сразу (например, когда пришло само сообщение)
+function removeTyping(animated) {
+  clearTimeout(typingTimer);
   const r = document.getElementById('typingRow');
-  if (r) r.remove();
+  if (r) {
+    if (animated && r.isConnected && !r.classList.contains('typing-out')) {
+      r.style.height = r.offsetHeight + 'px';
+      void r.offsetHeight;
+      r.classList.add('typing-out');
+      r.style.height = r.style.marginTop = r.style.marginBottom = r.style.paddingTop = r.style.paddingBottom = '0px';
+      setTimeout(() => { if (r.classList.contains('typing-out')) r.remove(); }, 260);
+    } else if (!animated) {
+      r.remove();
+    }
+  }
   const st = document.querySelector('#chatHdr .hdr-status.typing');
   if (st) { st.innerHTML = st.dataset.orig || ''; st.classList.remove('typing'); delete st.dataset.orig; }
 }
@@ -5674,6 +5765,7 @@ function openCreateModal(type) {
   // Reset fields
   document.getElementById('createName').value = '';
   document.getElementById('createUsername').value = '';
+  document.getElementById('createPrivate').checked = false;
   document.getElementById('createDesc').value = '';
   document.getElementById('createNameErr').classList.remove('vis');
   document.getElementById('createUsernameErr').classList.remove('vis');
@@ -5691,8 +5783,15 @@ function switchCreateType(type) {
   updateCreateModalUI();
 }
 
+function isCreatingPrivate() {
+  return currentCreateType === 'group' && !!document.getElementById('createPrivate')?.checked;
+}
+
 function updateCreateModalUI() {
   const isChannel = currentCreateType === 'channel';
+  document.getElementById('createPrivateRow').style.display = isChannel ? 'none' : 'flex';
+  document.getElementById('createUsernameField').style.display = isCreatingPrivate() ? 'none' : '';
+  if (isCreatingPrivate()) document.getElementById('createUsernameErr').classList.remove('vis');
   const isStep1 = createCurrentStep === 1;
   const isStep2 = createCurrentStep === 2;
 
@@ -5739,7 +5838,7 @@ function createGoNext() {
   const usernameRaw = document.getElementById('createUsername').value.trim();
   const username = usernameRaw.replace(/^@/, '');
   if (!name) { document.getElementById('createNameErr').classList.add('vis'); document.getElementById('createName').focus(); return; }
-  if (!username) { document.getElementById('createUsernameErr').classList.add('vis'); document.getElementById('createUsername').focus(); return; }
+  if (!username && !isCreatingPrivate()) { document.getElementById('createUsernameErr').classList.add('vis'); document.getElementById('createUsername').focus(); return; }
   document.getElementById('createNameErr').classList.remove('vis');
   document.getElementById('createUsernameErr').classList.remove('vis');
   // Go to step 2 — member picker
@@ -5831,9 +5930,10 @@ function submitCreateChat() {
   const usernameRaw = document.getElementById('createUsername').value.trim();
   const username = usernameRaw.replace(/^@/, '');
   const description = document.getElementById('createDesc').value.trim();
-  if (!name || !username) return;
+  const isPrivate = isCreatingPrivate();
+  if (!name || (!username && !isPrivate)) return;
   const memberIds = currentCreateType === 'group' ? [...selectedMemberIds] : [];
-  wsSend({ type: 'create_channel', name, username, chType: currentCreateType, description, memberIds });
+  wsSend({ type: 'create_channel', name, username: isPrivate ? '' : username, isPrivate, chType: currentCreateType, description, memberIds });
   closeCreateModal();
 }
 
@@ -5888,7 +5988,7 @@ function openChannelChat(c) {
     '<div class="chat-hdr" id="chatHdr">' +
       chAvaHtml +
       '<div class="hdr-info" style="cursor:pointer" onclick="openChannelInfo(\'' + c.id + '\')">' +
-        '<div class="hdr-name">' + c.name + (c.verifiedOrg ? verifyCheckHtml(16) : '') + '<span class="ch-hdr-badge">' + (c.isChannel ? 'канал' : 'группа') + '</span></div>' +
+        '<div class="hdr-name">' + c.name + (c.verifiedOrg ? verifyCheckHtml(16) : '') + '<span class="ch-hdr-badge">' + (c.isChannel ? 'канал' : (c.isPrivate ? 'частная группа' : 'группа')) + '</span></div>' +
         '<div class="hdr-status">' + statusHtml + '</div>' +
       '</div>' +
       '<div class="hdr-btns">' +
@@ -6180,7 +6280,7 @@ function renderChannelInfoPanel(channelId) {
   const isOwner = c.ownerId === myUser?.id;
   const count = c.subscribers || 0;
   fixContactLook(c);
-  const typeLabel = c.isChannel ? 'Канал' : 'Группа';
+  const typeLabel = c.isChannel ? 'Канал' : (c.isPrivate ? 'Частная группа' : 'Группа');
 
   document.getElementById('chInfoTitle').textContent = typeLabel;
 
@@ -6572,16 +6672,16 @@ function showRewardBurst() {
 // ═══════════════════════════════════════════════════════
 
 const GIFTS = [
-  { id:'candy_cane',   name:'Candy Cane',   price:15,    stock:5000, limited:true  },
+  { id:'candy_cane',   name:'Candy Cane',   price:15,    stock:50, limited:true  },
   { id:'test_gift_1',  name:'Test Gift 1',  price:10,    stock:5,    limited:true,  adminOnly:true },
   { id:'test_gift_2',  name:'Test Gift 2',  price:15,    stock:10,   limited:true,  adminOnly:true },
   { id:'wine',         name:'Wine',         price:50,    stock:450,  limited:true  },
-  { id:'lollipop',     name:'Lollipop',     price:75,    stock:1000, limited:true  },
+  { id:'lollipop',     name:'Lollipop',     price:75,    stock:100, limited:true  },
   { id:'scared_cat',   name:'Scared Cat',   price:100,   stock:500,  limited:true  },
   { id:'heart',        name:'Heart',        price:175,   stock:null, limited:false },
-  { id:'spy_agaric',   name:'Spy Agaric',   price:200,   stock:4000, limited:true  },
-  { id:'cake',         name:'Cake',         price:500,   stock:3000, limited:true  },
-  { id:'astral_shard', name:'Crystal Ball', price:555,   stock:1487, limited:true  },
+  { id:'spy_agaric',   name:'Spy Agaric',   price:200,   stock:100, limited:true  },
+  { id:'cake',         name:'Cake',         price:500,   stock:30, limited:true  },
+  { id:'astral_shard', name:'Crystal Ball', price:555,   stock:150, limited:true  },
   { id:'plush_pepe',   name:'Plush Pepe',   price:2000,  stock:500,  limited:true  },
   { id:'duck',         name:'Duck',         price:7000,  stock:null, limited:false },
   { id:'durov_cap',    name:'Durov Cap',    price:10000, stock:null, limited:false },
@@ -10446,7 +10546,7 @@ function renderWallet() {
     <div class="vx-wallet-sub">≈ <span id="vxVal">${vN(VX_PREV.val ?? me.valueStars)}</span> ${vStar()} · ${me.locked ? vN(me.locked) + ' в инвестициях' : 'на балансе'}</div>
     <div class="vx-pnl"><div><small>Прибыль / убыток</small><b class="${vCls(me.pnl)}">${me.pnl > 0 ? '+' : me.pnl < 0 ? '−' : ''}${vN(Math.abs(me.pnl))} ${vStar()}</b></div><b class="${vCls(me.pnl)}">${vArrow(me.pnl)} ${vPct(me.pnlPct)}</b></div>
     <div class="vx-limit">${vxDonut([{ v:me.boughtToday, color:'#8b5cf6' }, { v:left, color:'rgba(255,255,255,.1)' }], { size:86, stroke:10, anim:VLP.enter, center:`<b style="font-size:15px">${Math.round(lim)}%</b>` })}
-      <div class="txt">Куплено сегодня<br><b>${vN(me.boughtToday)} / ${vN(me.dailyLimit)}</b> $VLP<br>Сброс через <b id="vlpReset">--:--:--</b></div></div>
+      <div class="txt">Куплено всеми сегодня<br><b>${vN(me.boughtToday)} / ${vN(me.dailyLimit)}</b> $VLP<br>Сброс через <b id="vlpReset">--:--:--</b></div></div>
     <div class="vx-cell" style="margin-bottom:12px"><small>Доступно звёзд</small><b>${vStars()} ${isStarsUnlimited ? '' : vStar()}</b></div>
     <div class="vx-btns"><button class="vx-btn buy" onclick="openTrade('buy')" ${left <= 0 || m.available <= 0 ? 'disabled' : ''}>Купить $VLP</button>
       <button class="vx-btn sell" onclick="openTrade('sell')" ${me.vlp <= 0 ? 'disabled' : ''}>Продать $VLP</button>
@@ -10610,7 +10710,7 @@ function renderTrade() {
   const titles = { buy:'Купить $VLP', sell:'Продать $VLP', invest:`Купить: ${a ? a.icon + ' ' + vEsc(a.name) : ''}`, divest:`Продать: ${a ? a.icon + ' ' + vEsc(a.name) : ''}` };
   const left = Math.max(0, me.dailyLimit - me.boughtToday);
   const subs = {
-    buy:`Курс: 1 $VLP = ${vRate(m.rate)} ⭐ · лимит сегодня: ещё ${vN(left)} $VLP`,
+    buy: vlpBuySub(m, me),
     sell:`Доступно: ${vN(me.vlp)} $VLP · курс ${vRate(m.rate)} ⭐`,
     invest: a ? `Цена: ${vRate(a.rate)} ⭐ за ед. · у вас ${T.currency === 'vlp' ? vN(me.vlp) + ' $VLP' : vStars() + ' ⭐'}` : '',
     divest: pos ? `Позиция: ${vN(pos.value)} ${T.currency === 'vlp' ? '$VLP' : '⭐'}` : 'У вас нет такой позиции',
@@ -10676,6 +10776,21 @@ function vlpApply(m) {
   VLP.base = { vlp: m.market.rate / (1 + m.market.periodChange / 100) };
   m.assets.forEach(a => { VLP.base[a.id] = a.rate / (1 + a.periodChange / 100); });
 }
+/* Общий дневной лимит: обновляем у всех сразу, не сбрасывая введённое в окне покупки */
+function vlpBuySub(m, me) {
+  return `Курс: 1 $VLP = ${vRate(m.rate)} ⭐ · общий лимит: осталось ${vN(Math.max(0, me.dailyLimit - me.boughtToday))} $VLP`;
+}
+function vlpApplySharedLimit(bought) {
+  if (typeof bought !== 'number' || !VLP.me || VLP.me.boughtToday === bought) return;
+  VLP.me.boughtToday = bought;
+  if (!VLP.open) return;
+  if (VLP.tab === 'market') { VLP.enter = false; renderWallet(); vlpClock(); }
+  if (VLP.trade && VLP.trade.mode === 'buy') {
+    const { m, me } = tradeCtx(), sub = document.querySelector('#vlpModal .sub');
+    if (sub) sub.textContent = vlpBuySub(m, me);
+    VLP.trade.quick = tradeQuick();
+  }
+}
 function vlpHandle(msg) {
   switch (msg.type) {
     case 'velosipe_market':
@@ -10710,6 +10825,7 @@ function vlpHandle(msg) {
     case 'velosipe_tick': {
       if (!VLP.market) break;
       const old = VLP.market.rate; Object.assign(VLP.market, msg.market); VLP.flash = Math.sign(msg.market.rate - old);
+      vlpApplySharedLimit(msg.market.dailyBought);
       const h = VLP.market.history;
       if (h && (!h.length || h[h.length - 1].t < msg.t)) { h.push({ t:msg.t, r:msg.market.rate }); if (h.length > 320) h.shift(); }
       VLP.assets.forEach(a => {
@@ -10726,6 +10842,9 @@ function vlpHandle(msg) {
       }
       break;
     }
+    case 'velosipe_limit':
+      vlpApplySharedLimit(msg.bought);
+      break;
     case 'market_news':
       VLP.news.unshift(msg.news); VLP.news.length = Math.min(VLP.news.length, 40); VLP.newsId = msg.news.id;
       if (VLP.open && VLP.tab === 'news') { VLP.enter = false; renderPane({}); }

@@ -11,7 +11,7 @@ const storage = require('./storage');
 
 const PORT      = process.env.PORT || 3000;
 // Пароль администратора для /l. На хостинге задайте переменную окружения ADMIN_PASSWORD.
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '888899990ror';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'rgeok4309fkl443p';
 // Официальный канал новостей: все новые пользователи подписываются автоматически.
 // Публиковать могут только те, кто ввёл секретную команду в боте Nethgram
 // (на хостинге её лучше переопределить переменной окружения NEWS_POSTER_COMMAND).
@@ -108,7 +108,8 @@ const GIFT_NAMES  = {};
 GIFT_DEFS.forEach(g => {
   GIFT_PRICES[g.id] = g.price;
   GIFT_NAMES[g.id]  = g.name;
-  if (!giftStock.has(g.id)) giftStock.set(g.id, g.stock);
+  // limited:false — подарок без тиража (в магазине показывается как ∞)
+  giftStock.set(g.id, g.limited ? g.stock : null);
 });
 
 // ── NFT MODELS ──
@@ -256,6 +257,20 @@ const pct = (prev, cur) => prev ? r2(((cur - prev) / prev) * 100) : 0;
 const dayKey = () => { const d = new Date(); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }; // серверное время
 const nextMidnight = () => { const d = new Date(); d.setHours(24, 0, 0, 0); return d.getTime(); };
 
+/** Общий на всех дневной лимит покупки $VLP: сколько уже куплено всеми сегодня */
+function sharedVlpDaily() {
+  const today = dayKey();
+  if (velosipe.dailyDate !== today) {
+    let bought = 0;
+    // первый запуск после обновления: учитываем то, что люди уже купили сегодня
+    if (!velosipe.dailyDate) {
+      for (const rec of userVelosipe.values()) if (rec.boughtDate === today) bought += rec.boughtToday || 0;
+    }
+    velosipe.dailyDate = today;
+    velosipe.dailyBought = bought;
+  }
+  return velosipe.dailyBought;
+}
 function getUserVlp(uid) {
   let rec = userVelosipe.get(uid);
   if (!rec) { rec = { balance:0, boughtToday:0, boughtDate:dayKey(), basis:0 }; userVelosipe.set(uid, rec); }
@@ -334,7 +349,7 @@ function randomNewsEvent() {
 }
 
 function marketLive() {
-  return { rate:velosipe.rate, prevRate:velosipe.prevRate, change:pct(velosipe.prevRate, velosipe.rate),
+  return { dailyBought:sharedVlpDaily(), rate:velosipe.rate, prevRate:velosipe.prevRate, change:pct(velosipe.prevRate, velosipe.rate),
            available:velosipe.available, circulating:VLP_TOTAL_SUPPLY - velosipe.available };
 }
 function assetsLive() {
@@ -367,7 +382,7 @@ function meView(uid) {
   const basis = rec.basis + pos.filter(p => p.currency === 'vlp').reduce((s, p) => s + p.basis, 0);
   const held = rec.balance + locked, valueStars = Math.floor(held * velosipe.rate);
   const pnl = held ? Math.round(valueStars - basis) : 0;
-  return { vlp:rec.balance, locked, stars:userStars.get(uid) || 0, boughtToday:rec.boughtToday, dailyLimit:VLP_DAILY_LIMIT,
+  return { vlp:rec.balance, locked, stars:userStars.get(uid) || 0, boughtToday:sharedVlpDaily(), myBoughtToday:rec.boughtToday, dailyLimit:VLP_DAILY_LIMIT,
            valueStars, pnl, basis:Math.round(basis), pnlPct: basis > 0 ? r2((pnl / basis) * 100) : 0 };
 }
 function velosipeSnapshot(uid, period) {
@@ -418,7 +433,7 @@ function saveNow() {
       id:u.id, name:u.name, phone:u.phone, initials:u.initials, color:u.color,
       avatarUrl:u.avatarUrl||null, username:u.username||null, wornNft:u.wornNft||null, nameBadge:u.nameBadge||null,
       profileBg:u.profileBg||null, cloudPwd:u.cloudPwd||null, tokens:u.tokens||[],
-      verifiedOrg:u.verifiedOrg||null,
+      verifiedOrg:u.verifiedOrg||null, pushDevices:u.pushDevices||null,
     }));
     const messagesObj = {};
     for (const [k, v] of messages) messagesObj[k] = v;
@@ -428,7 +443,7 @@ function saveNow() {
       description:ch.description||'', members:[...ch.members],
       admins:[...(ch.admins||[])],
       extraSubscribers:ch.extraSubscribers||0, extraMembers:ch.extraMembers||0, createdAt:ch.createdAt,
-      verifiedOrg:ch.verifiedOrg||null, autoSubscribedAll:!!ch.autoSubscribedAll,
+      verifiedOrg:ch.verifiedOrg||null, autoSubscribedAll:!!ch.autoSubscribedAll, isPrivate:!!ch.isPrivate,
     }));
     const giftStockObj = {};
     for (const [id, stock] of giftStock) giftStockObj[id] = stock;
@@ -466,6 +481,25 @@ function saveNow() {
   } catch(e) { console.error('Save error:', e.message); }
 }
 
+/** Остаток не может быть больше, чем тираж минус реально выданные подарки (чинит прошлые сбросы) */
+function restoreGiftStock() {
+  const used = new Map();
+  const count = g => {
+    if (!g || !g.giftId) return;
+    // подарки от бота (/autosend) тираж не расходуют, улучшение в NFT расходует ещё одну единицу
+    const n = (g.fromId === 'bot_nethgram' ? 0 : 1) + (g.isNft ? 1 : 0);
+    used.set(g.giftId, (used.get(g.giftId) || 0) + n);
+  };
+  for (const list of userGifts.values()) list.forEach(count);
+  for (const list of channelGifts.values()) list.forEach(count);
+  for (const def of GIFT_DEFS) {
+    if (!def.limited) continue;
+    const real = Math.max(0, def.stock - (used.get(def.id) || 0));
+    const cur = giftStock.get(def.id);
+    if (cur === null || cur === undefined || cur > real) giftStock.set(def.id, real);
+  }
+}
+
 function loadState() {
   try {
     let data = global.__NETHGRAM_DATA;
@@ -482,8 +516,10 @@ function loadState() {
         extraSubscribers:ch.extraSubscribers||0, extraMembers:ch.extraMembers||0,
       });
     }
+    // Сохранённый остаток важнее значения по умолчанию, иначе тираж сбрасывается при каждом запуске
     for (const [id, stock] of Object.entries(data.giftStock||{})) {
-      if (!giftStock.has(id)) giftStock.set(id, stock);
+      const def = GIFT_DEFS.find(g => g.id === id);
+      if (def && def.limited && Number.isFinite(Number(stock)) && stock !== null) giftStock.set(id, Math.max(0, Math.floor(Number(stock))));
     }
     for (const [uid, gifts] of Object.entries(data.userGifts||{})) userGifts.set(uid, gifts);
     for (const [gid, cnt] of Object.entries(data.nftCounters||{})) nftCounters.set(gid, Number(cnt));
@@ -498,6 +534,7 @@ function loadState() {
     if (data.globalSoldOut !== undefined) globalSoldOut = !!data.globalSoldOut;
     loadVelosipe(data.velosipe);
     for (const id of (data.premiumUsers||[])) premiumUsers.add(id);
+    restoreGiftStock();
     console.log('State loaded:', users.size, 'users,', channels.size, 'channels');
   } catch(e) { console.error('Load error:', e.message); }
 }
@@ -603,6 +640,74 @@ function findUserForAdmin(query) {
   return findUserByPremiumUsername(q) || null;
 }
 
+// ── Уведомления Android без Firebase ──
+// Приложение держит отдельное лёгкое соединение. Его токен годится только для получения уведомлений:
+// войти с ним в аккаунт нельзя. В базе хранится только хеш токена.
+const pushSockets = new Map();   // userId -> Map(deviceId -> socket)
+const PUSH_MAX_DEVICES = 5, PUSH_REPLAY_MS = 48 * 60 * 60 * 1000, PUSH_REPLAY_MAX = 50;
+const validDeviceId = v => typeof v === 'string' && /^[\w-]{16,64}$/.test(v);
+
+function pushPreview(text) {
+  const t = String(text || '');
+  if (t.charCodeAt(0) === 123) {
+    try {
+      const d = JSON.parse(t);
+      if (d && d.isPhoto) return d.caption ? '📷 ' + String(d.caption).slice(0, 160) : '📷 Фото';
+      if (d && d.isSticker) return '🎭 Стикер';
+      if (d && d.isNftTransfer) return '🎁 NFT: ' + String(d.giftName || 'подарок').slice(0, 60);
+      if (d && d.isGift) return '🎁 Подарок: ' + String(d.giftName || '').slice(0, 60);
+    } catch (e) {}
+  }
+  const plain = t.replace(/\[\[e:\d+_\d+\]\]/g, '🙂').replace(/\s+/g, ' ').trim();
+  return plain.length > 200 ? plain.slice(0, 199) + '…' : plain;
+}
+function pushNotify(uid, item) {
+  const devices = pushSockets.get(uid);
+  if (!devices || !devices.size) return;
+  const msg = { type:'push', id:String(item.id), chatId:item.chatId, title:cleanText(item.title, 64),
+                sender:item.sender ? cleanText(item.sender, 64) : null, body:pushPreview(item.text), ts:item.ts || Date.now() };
+  for (const sock of devices.values()) if (isSocketOpen(sock)) safeSend(sock, msg);
+}
+function pushItemFor(uid, chatId, m, ch) {
+  const from = users.get(m.from);
+  const sender = (from && from.name) || m.fromName || 'Пользователь';
+  if (ch) return { id:m.id, chatId:ch.id, title:ch.name, sender: ch.type === 'channel' ? null : sender, text:m.text, ts:m.ts };
+  return { id:m.id, chatId, title:sender, sender:null, text:m.text, ts:m.ts };
+}
+/** Сообщения, пришедшие, пока телефон был без связи */
+function replayPushes(uid, socket, sinceRaw) {
+  const now = Date.now();
+  const since = Math.max(Number(sinceRaw) || 0, now - PUSH_REPLAY_MS);
+  if (!Number(sinceRaw)) return;
+  const found = [];
+  const collect = (list, chatId, ch) => {
+    for (let i = list.length - 1, n = 0; i >= 0 && n < 20; i--) {
+      const m = list[i];
+      if (!m || !(m.ts > since)) break;
+      if (m.ts > now || m.from === uid || String(m.from).startsWith('bot_')) continue;
+      found.push(pushItemFor(uid, chatId, m, ch)); n++;
+    }
+  };
+  for (const [key, list] of messages) {
+    if (key.startsWith('ch_') || !key.includes('::')) continue;
+    const [a, b] = key.split('::');
+    if (a === uid || b === uid) collect(list, a === uid ? b : a, null);
+  }
+  for (const ch of channels.values()) {
+    if (ch.members.has(uid)) collect(messages.get('ch_' + ch.id) || [], ch.id, ch);
+  }
+  found.sort((x, y) => x.ts - y.ts).slice(-PUSH_REPLAY_MAX).forEach(item => {
+    safeSend(socket, { type:'push', id:String(item.id), chatId:item.chatId, title:cleanText(item.title, 64),
+      sender:item.sender ? cleanText(item.sender, 64) : null, body:pushPreview(item.text), ts:item.ts });
+  });
+}
+function dropPushDevice(uid, deviceId) {
+  const devices = pushSockets.get(uid);
+  const sock = devices && devices.get(deviceId);
+  if (sock) { devices.delete(deviceId); try { sock.destroy(); } catch (e) {} }
+  if (devices && !devices.size) pushSockets.delete(uid);
+}
+
 // ── Звёзды: баланс считает только сервер ──
 function starsOf(uid) { return userStars.get(uid) || 0; }
 function trySpendStars(uid, cost) {
@@ -621,11 +726,17 @@ function isForgedGiftText(t) {
   try { const d = JSON.parse(t); return !!d && (d.isGift === true || d.isNftTransfer === true); } catch (e) { return false; }
 }
 
+/** Частную группу видят и читают только её участники */
+function canSeeChannel(ch, uid) {
+  return !!ch && (!ch.isPrivate || (!!uid && ch.members.has(uid)));
+}
+
 // ── Подарки каналов и групп: управляют только владелец и админы ──
 function canManageChannelGifts(ch, uid) {
   return !!ch && !!uid && (ch.ownerId === uid || !!(ch.admins && ch.admins.has(uid)));
 }
 function visibleChannelGifts(ch, uid) {
+  if (!canSeeChannel(ch, uid)) return [];
   const all = (ch && channelGifts.get(ch.id)) || [];
   return canManageChannelGifts(ch, uid) ? all : all.filter(g => !g.hidden);
 }
@@ -753,7 +864,7 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
       console.log('\x1b[33m' + logLine + '\x1b[0m');
       if (aLogsActive) process.stdout.write(logLine + '\n');
       return {
-        text: '✅ Авторизация успешна! Вы вошли как администратор.\n\nДоступные команды:\n/mail [текст] — разослать всем\n/unlim [кол] — накрутить звёзды\n/unlimited — бесконечные звёзды\n/sub @канал [кол] — накрутить подписчиков\n/autosend [подарок] [кол] — отправить себе подарки\n/memb @чат [кол] [имя] — добавить участников\n/addus [юзернейм] [цена] — добавить коллекционный юзернейм\n/sold true/false — режим sold out\n/setphone [номер] — изменить свой номер\n/gives [кол-во] [пользователь] — подарить звёзды\n/sets [кол-во] — установить свой баланс\n/support — контакт поддержки',
+        text: '✅ Авторизация успешна! Вы вошли как администратор.\n\nДоступные команды:\n/mail [текст] — разослать всем\n/unlim [кол] — накрутить звёзды\n/unlimited — бесконечные звёзды\n/sub @канал [кол] — накрутить подписчиков\n/autosend [подарок] [кол] — отправить себе подарки\n/memb @чат [кол] [имя] — добавить участников\n/addus [юзернейм] [цена] — добавить коллекционный юзернейм\n/sold true/false — режим sold out\n/setphone [номер] — изменить свой номер\n/gives [кол-во] [пользователь] — подарить звёзды\n/sets [кол-во] — установить свой баланс\n/logs — список пользователей\n/alogs — список админов\n/support — контакт поддержки',
         admin: true
       };
     }
@@ -939,6 +1050,33 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
       }
     }
     return { text: '✅ Номер телефона изменён на ' + newPhone, setPhone: newPhone };
+  }
+
+  // /logs — список всех пользователей
+  if (t === '/logs' || t.startsWith('/logs ')) {
+    if (!isAdmin) return { text: '🔒 Команда /logs доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
+    const all = [...users.values()];
+    if (all.length === 0) return { text: '👥 Пользователей пока нет.' };
+    const online = all.filter(u => isSocketOpen(u.ws)).length;
+    const lines = all.map((u, i) =>
+      (i + 1) + '. ' + (isSocketOpen(u.ws) ? '🟢 ' : '⚪ ') + (u.name || 'Без имени') +
+      (u.username ? ' (@' + u.username + ')' : '') + (u.phone ? ' — ' + u.phone : ''));
+    return { text: '👥 Пользователи (' + all.length + ', онлайн ' + online + '):\n\n' + lines.join('\n') };
+  }
+
+  // /alogs — список администраторов
+  if (t === '/alogs' || t.startsWith('/alogs ')) {
+    if (!isAdmin) return { text: '🔒 Команда /alogs доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
+    const adminIds = [...nethgramAdminUsers];
+    if (adminIds.length === 0) return { text: '👮 Нет авторизованных администраторов.' };
+    const lines = adminIds.map((uid, i) => {
+      const u = users.get(uid);
+      const last = [...adminAuthLogs].reverse().find(e => e.userId === uid);
+      return (i + 1) + '. ' + (u && isSocketOpen(u.ws) ? '🟢 ' : '⚪ ') + (u ? u.name : uid) +
+        (u && u.username ? ' (@' + u.username + ')' : '') + (u && u.phone ? ' — ' + u.phone : '') +
+        (last ? '\n    вход: ' + last.ts : '');
+    });
+    return { text: '👮 Администраторы (' + adminIds.length + '):\n\n' + lines.join('\n') };
   }
 
   // /admins
@@ -1176,7 +1314,7 @@ function sanitizeChannel(ch) {
     avatarUrl:ch.avatarUrl||null, avatarEmoji:ch.avatarEmoji||null,
     description:ch.description||'', members:realMembers, subscribers:realMembers+extra,
     extraSubscribers:ch.extraSubscribers||0, extraMembers:ch.extraMembers||0, createdAt:ch.createdAt,
-    verifiedOrg: ch.verifiedOrg||null,
+    verifiedOrg: ch.verifiedOrg||null, isPrivate: !!ch.isPrivate,
   };
 }
 
@@ -1349,6 +1487,7 @@ server.on('upgrade', (req, socket) => {
 
   let userId = null;
   let userAdminBotAuthorized = false;
+  let pushOwner = null, pushDevice = null;   // это соединение только для уведомлений
   function send(obj) { safeSend(socket, obj); }
 
   let buffer = Buffer.alloc(0);
@@ -1410,6 +1549,13 @@ server.on('upgrade', (req, socket) => {
   });
 
   socket.on('close', () => {
+    if (pushOwner) {
+      const devices = pushSockets.get(pushOwner);
+      if (devices && devices.get(pushDevice) === socket) {
+        devices.delete(pushDevice);
+        if (!devices.size) pushSockets.delete(pushOwner);
+      }
+    }
     if (userId && users.has(userId)) {
       const u = users.get(userId);
       u.online = false; u.ws = null;
@@ -1420,11 +1566,64 @@ server.on('upgrade', (req, socket) => {
 
   function handleMessage(msg) {
     cleanClientFields(msg);
+    if (pushOwner) return;
     if (!userId && ['create_channel','update_name','set_username','check_username'].includes(msg.type)) {
       send({ type:'session_lost' });
       return;
     }
     switch (msg.type) {
+
+      case 'get_push_token': {
+        if (!userId || !validDeviceId(msg.deviceId)) break;
+        const me = users.get(userId);
+        if (!me) break;
+        // устройство могло раньше принадлежать другому аккаунту
+        for (const other of users.values()) {
+          if (other.id !== userId && other.pushDevices && other.pushDevices[msg.deviceId]) {
+            delete other.pushDevices[msg.deviceId];
+            dropPushDevice(other.id, msg.deviceId);
+          }
+        }
+        const token = crypto.randomBytes(32).toString('hex');
+        me.pushDevices = me.pushDevices || {};
+        me.pushDevices[msg.deviceId] = { hash: sha256hex(token), ts: Date.now() };
+        const ids = Object.keys(me.pushDevices).sort((a, b) => me.pushDevices[a].ts - me.pushDevices[b].ts);
+        while (ids.length > PUSH_MAX_DEVICES) { const old = ids.shift(); delete me.pushDevices[old]; dropPushDevice(userId, old); }
+        scheduleSave();
+        send({ type:'push_token', token });
+        break;
+      }
+
+      case 'revoke_push_token': {
+        if (!userId || !validDeviceId(msg.deviceId)) break;
+        const me = users.get(userId);
+        if (me && me.pushDevices && me.pushDevices[msg.deviceId]) {
+          delete me.pushDevices[msg.deviceId];
+          dropPushDevice(userId, msg.deviceId);
+          scheduleSave();
+        }
+        break;
+      }
+
+      case 'push_subscribe': {
+        if (userId || !validDeviceId(msg.deviceId) || typeof msg.token !== 'string') { send({ type:'push_denied' }); break; }
+        const hash = sha256hex(msg.token);
+        let owner = null;
+        for (const u of users.values()) {
+          const rec = u.pushDevices && u.pushDevices[msg.deviceId];
+          if (rec && rec.hash === hash) { owner = u; break; }
+        }
+        if (!owner) { send({ type:'push_denied' }); break; }
+        if (!pushSockets.has(owner.id)) pushSockets.set(owner.id, new Map());
+        const devices = pushSockets.get(owner.id);
+        const prev = devices.get(msg.deviceId);
+        if (prev && prev !== socket) { try { prev.destroy(); } catch (e) {} }
+        devices.set(msg.deviceId, socket);
+        pushOwner = owner.id; pushDevice = msg.deviceId;
+        send({ type:'push_ok', now: Date.now() });
+        replayPushes(owner.id, socket, msg.since);
+        break;
+      }
 
       case 'request_code': {
         const code = String(Math.floor(10000 + Math.random() * 90000));
@@ -1614,7 +1813,7 @@ server.on('upgrade', (req, socket) => {
         }
         // Каналы
         const chResults = [...channels.values()]
-          .filter(ch => ch.name.toLowerCase().includes(q) || normUn(ch.username).includes(q))
+          .filter(ch => !ch.isPrivate && (ch.name.toLowerCase().includes(q) || normUn(ch.username).includes(q)))
           .map(ch => {
             const extra = (ch.extraSubscribers||0) + (ch.extraMembers||0);
             return { ...sanitizeChannel(ch), subscribers: ch.members.size + extra };
@@ -1632,7 +1831,7 @@ server.on('upgrade', (req, socket) => {
       case 'get_channel_messages':
       case 'get_channel_history': {
         const ch = channels.get(msg.channelId);
-        if (!ch) break;
+        if (!canSeeChannel(ch, userId)) break;
         const key = 'ch_' + msg.channelId;
         const history = messages.get(key) || [];
         send({ type:'channel_messages', channelId: msg.channelId, messages: history });
@@ -1673,7 +1872,7 @@ server.on('upgrade', (req, socket) => {
 
       case 'get_channel_members': {
         const ch = channels.get(msg.channelId);
-        if (!ch) break;
+        if (!canSeeChannel(ch, userId)) break;
         const memberList = [...ch.members].map(mid => {
           const u = users.get(mid);
           const isAdm = ch.admins ? ch.admins.has(mid) : false;
@@ -1686,7 +1885,8 @@ server.on('upgrade', (req, socket) => {
 
       case 'create_channel': {
         if (!userId) break;
-        const wantUn = String(msg.username || '').replace(/^@/, '').toLowerCase();
+        const makePrivate = msg.isPrivate === true && (msg.channelType || msg.chType) === 'group';
+        const wantUn = makePrivate ? '' : String(msg.username || '').replace(/^@/, '').toLowerCase();
         if (wantUn && [...channels.values()].some(c => (c.username || '').toLowerCase() === wantUn)) {
           send({ type:'create_channel_result', ok:false, error:'Юзернейм @' + wantUn + ' уже занят' });
           break;
@@ -1701,7 +1901,7 @@ server.on('upgrade', (req, socket) => {
           }
         }
         const newCh = {
-          id: chId, name: msg.name, username: msg.username || '', type: requestedType,
+          id: chId, name: msg.name, username: makePrivate ? '' : (msg.username || ''), type: requestedType, isPrivate: makePrivate,
           ownerId: userId, members, admins: new Set(), avatarUrl: null, avatarEmoji: msg.emoji || null,
           description: msg.description || '', extraSubscribers: 0, extraMembers: 0, createdAt: Date.now(),
         };
@@ -1731,6 +1931,11 @@ server.on('upgrade', (req, socket) => {
         if (!userId) break;
         const ch = channels.get(msg.channelId);
         if (!ch) break;
+        // В частную группу можно попасть, только если добавит владелец или админ
+        if (ch.isPrivate && !ch.members.has(userId)) {
+          send({ type:'join_result', ok:false, channelId: ch.id, error:'Это частная группа' });
+          break;
+        }
         ch.members.add(userId);
         scheduleSave();
         const sanitized = sanitizeChannel(ch);
@@ -1861,6 +2066,10 @@ server.on('upgrade', (req, socket) => {
         if (!userId) break;
         const ch = channels.get(msg.channelId);
         if (!ch) break;
+        if (!canSeeChannel(ch, userId)) {
+          send({ type:'channel_post_denied', channelId: msg.channelId, msgId: msg.msgId || null, text:'Вы не участник этой группы.' });
+          break;
+        }
         // В канале (не группе) публикуют только владелец и администраторы — проверка на сервере
         if (ch.type === 'channel' && ch.ownerId !== userId && !(ch.admins && ch.admins.has(userId))) {
           send({ type:'channel_post_denied', channelId: ch.id, msgId: msg.msgId || null,
@@ -1932,6 +2141,7 @@ server.on('upgrade', (req, socket) => {
         for (const mid of ch.members) {
           const u = users.get(mid);
           if (u && isSocketOpen(u.ws)) safeSend(u.ws, { type:'channel_message', channelId: msg.channelId, message: newMsg });
+          if (mid !== userId) pushNotify(mid, pushItemFor(mid, ch.id, newMsg, ch));
         }
         break;
       }
@@ -1942,7 +2152,7 @@ server.on('upgrade', (req, socket) => {
         const ch = channels.get(msg.channelId);
         if (!ch || ch.ownerId !== userId) break;
         if (msg.name) ch.name = msg.name;
-        if (msg.username !== undefined) ch.username = msg.username;
+        if (msg.username !== undefined && !ch.isPrivate) ch.username = msg.username;
         if (msg.description !== undefined) ch.description = msg.description;
         if (msg.avatarUrl !== undefined) ch.avatarUrl = msg.avatarUrl;
         if (msg.avatarEmoji !== undefined) ch.avatarEmoji = msg.avatarEmoji;
@@ -2184,6 +2394,7 @@ server.on('upgrade', (req, socket) => {
                   safeSend(u.ws, { type:'message', chatWith:'bot_nethgram', message:bMsg });
                   safeSend(u.ws, { type:'broadcast_toast', text:broadText });
                 }
+                pushNotify(uid, { id:bMsg.id, chatId:'bot_nethgram', title:'Nethgram', text:broadText, ts:bMsg.ts });
               }
             }
             if (result.subChannel) {
@@ -2314,6 +2525,7 @@ server.on('upgrade', (req, socket) => {
               safeSend(recipient.ws, payload);
               safeSend(recipient.ws, { type:'new_message_notify', fromId:userId, fromName:senderUser?.name, text:'🎁 ' + (gData.giftName || 'Подарок') });
             }
+            if (toId !== userId) pushNotify(toId, pushItemFor(toId, userId, newMsg));
           } catch(e) {}
           break;
         }
@@ -2324,6 +2536,7 @@ server.on('upgrade', (req, socket) => {
           safeSend(recipient.ws, { type:'message', chatWith:userId, message: {...newMsg, fromName: senderUser?.name} });
           safeSend(recipient.ws, { type:'new_message_notify', fromId:userId, fromName:senderUser?.name, text:msg.text });
         }
+        if (toId !== userId) pushNotify(toId, pushItemFor(toId, userId, newMsg));
         break;
       }
 
@@ -2517,6 +2730,7 @@ server.on('upgrade', (req, socket) => {
               safeSend(targetUser.ws, { type:'message', chatWith:userId, message:{ ...tMsg, fromName:fromUser?.name } });
               safeSend(targetUser.ws, { type:'new_message_notify', fromId:userId, fromName:fromUser?.name, text:'🎁 ' + (nft.giftName || 'NFT-подарок') });
             }
+            pushNotify(toId, pushItemFor(toId, userId, tMsg));
           }
           if (isSocketOpen(targetUser.ws)) safeSend(targetUser.ws, { type:'nft_received', nft });
         }
@@ -2732,9 +2946,9 @@ server.on('upgrade', (req, socket) => {
         const want = toInt(msg.amount);
         if (!want) { send({ type:'velosipe_error', text:'Введите количество $VLP' }); break; }
         const rec = getUserVlp(userId);
-        const left = VLP_DAILY_LIMIT - rec.boughtToday;
-        if (left <= 0) { send({ type:'velosipe_error', text:'Дневной лимит покупки исчерпан. Он сбросится автоматически.' }); break; }
-        if (want > left) { send({ type:'velosipe_error', text:`Дневной лимит — ${VLP_DAILY_LIMIT.toLocaleString('ru-RU')} $VLP. Сегодня можно купить ещё ${left.toLocaleString('ru-RU')}` }); break; }
+        const left = VLP_DAILY_LIMIT - sharedVlpDaily();
+        if (left <= 0) { send({ type:'velosipe_error', text:'Общий дневной лимит исчерпан. Он сбросится автоматически.' }); break; }
+        if (want > left) { send({ type:'velosipe_error', text:`Общий дневной лимит — ${VLP_DAILY_LIMIT.toLocaleString('ru-RU')} $VLP. Сегодня осталось ${left.toLocaleString('ru-RU')} $VLP` }); break; }
         if (velosipe.available <= 0) { send({ type:'velosipe_error', text:'В резерве не осталось монет' }); break; }
         const n = Math.min(want, velosipe.available);
         const cost = Math.ceil(n * velosipe.rate - 1e-9);
@@ -2742,11 +2956,13 @@ server.on('upgrade', (req, socket) => {
         if (stars < cost) { send({ type:'velosipe_error', text:`Недостаточно звёзд: нужно ${cost.toLocaleString('ru-RU')} ⭐` }); break; }
         trySpendStars(userId, cost);
         rec.balance += n; rec.boughtToday += n; rec.basis += cost;
+        velosipe.dailyBought += n;
         velosipe.available -= n;
         const trade = { type:'buy', amount:n, rate:velosipe.rate, stars:cost };
         addTrade(userId, trade);
         scheduleSave();
         send({ ...velosipeSnapshot(userId, msg.period), type:'velosipe_trade_ok', kind:'buy', partial: n < want, trade });
+        broadcastAll(userId, { type:'velosipe_limit', bought: velosipe.dailyBought, limit: VLP_DAILY_LIMIT });
         break;
       }
 
