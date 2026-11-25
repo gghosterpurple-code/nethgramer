@@ -174,7 +174,7 @@ const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard'
 const VLP_TOTAL_SUPPLY = 500000;
 const VLP_START_RATE   = 500;
 const VLP_MIN_RATE     = 50;
-const VLP_MAX_RATE     = 20000;
+const VLP_MAX_RATE     = 100000;  // до ×200 от старта — место для огромных пампов
 const VLP_DAILY_LIMIT  = 10000;
 const VLP_TICK_MS      = 15000;
 const VLP_NEWS_MS      = 30000;
@@ -242,6 +242,25 @@ const assetsMarket = new Map(); // id -> {rate, prevRate, series}
 ASSET_DEFS.forEach(a => assetsMarket.set(a.id, { rate:a.start, prevRate:a.start, series:newSeries(a.start) }));
 const assetDef = id => ASSET_DEFS.find(a => a.id === id);
 
+// ── БИРЖА ПОДАРКОВ ──
+// У каждого обычного подарка свой курс в звёздах (двигается тем же движком, что и $VLP).
+// Подарок можно продать бирже по курсу или купить у биржи. Лимитированные подарки биржа продаёт
+// только из того, что ей продали игроки (новые не создаются), безлимитные — всегда.
+// NFT торгуются между игроками: выставил за свою цену → другой купил.
+const GM_SPREAD = 0.03;            // разница цены покупки и продажи (±3%)
+const GM_IMPACT = 0.01;            // каждая сделка двигает курс на 1%
+const giftMarket  = new Map();     // giftId -> {rate, prevRate, series, stock, ev, trend}
+const nftListings = [];            // [{id, sellerId, sellerName, price, ts, nft}]
+const GIFT_DEFS_TRADABLE = () => GIFT_DEFS.filter(d => !d.adminOnly);
+function giftBounds(def) { return [Math.max(1, def.price / 10), def.price * 50]; }
+function ensureGiftMarket() {
+  for (const d of GIFT_DEFS_TRADABLE()) if (!giftMarket.has(d.id)) giftMarket.set(d.id, { rate:d.price, prevRate:d.price, series:newSeries(d.price), stock:0 });
+}
+const gmBuyPrice  = g => Math.max(1, Math.ceil(g.rate * (1 + GM_SPREAD)));
+const gmSellPrice = g => Math.max(1, Math.floor(g.rate * (1 - GM_SPREAD)));
+function addStarsTo(uid, n) { const b = starsOf(uid); if (b < UNLIMITED_STARS) userStars.set(uid, b + n); }
+ensureGiftMarket();
+
 // dir: 1 рост, -1 падение, 0 случайно; min/max — размер скачка
 const NEWS_TEMPLATES = [
   { title:'🚨 СРОЧНЫЕ НОВОСТИ',    text:'В Литве обнаружено подозрительно большое картофельное поле.', target:'potato_fields',  dir:1,  min:.20, max:.45 },
@@ -290,18 +309,78 @@ function addTrade(uid, t) {
   if (arr.length > 200) arr.shift();
 }
 
-// шаг цены: небольшие колебания + мягкое притяжение к базе + редкий памп/дамп
-function stepRate(rate, base, min, max, jumpChance) {
-  let nr, jump = false;
-  if (Math.random() < jumpChance) {
-    nr = rate * (1 + (Math.random() < 0.5 ? -1 : 1) * (0.10 + Math.random() * 0.40)); jump = true;
-  } else {
-    const noise = Math.random() < 0.2 ? (Math.random() - 0.5) * 0.002 : (Math.random() * 2 - 1) * 0.004;
-    nr = rate * Math.exp(noise - Math.log(rate / base) * 0.0003);
-  }
-  return { rate: r2(Math.min(max, Math.max(min, nr))), jump };
+// ── Движок курса: тренды, резкие пампы до огромных иксов и обвалы ──
+// m — объект рынка ({rate, ev, trend, ...}); состояние события хранится в нём и переживает перезапуск.
+// Тик = 15 с. Шансы ниже — на один тик одного рынка.
+const MKT = {
+  noise: 0.009,        // обычная дрожь ±0.9% за тик
+  trendChance: 0.03,   // смена тренда (в среднем раз в ~8 мин)
+  trendMax: 0.004,     // сила тренда до ±0.4% за тик
+  revert: 0.0015,      // притяжение к базе (слабое — чтобы курс мог надолго уходить далеко)
+  spikeChance: 0.006,  // одиночная свеча ±6–25% (примерно раз в 40 мин)
+  pumpChance: 0.0018,  // начало пампа (примерно раз в 2,3 ч на рынок)
+  crashChance: 0.0016, // начало обвала
+  afterPumpDump: 0.6,  // после пампа в 60% случаев приходит слив
+};
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function pumpTarget() { // во сколько раз вырастет: чаще ×1.5–3, иногда ×3–10, редко ×10–40
+  const r = Math.random();
+  if (r < 0.6) return rnd(1.5, 3);
+  if (r < 0.9) return rnd(3, 10);
+  return rnd(10, 40);
 }
-function assetBounds(def) { return [Math.max(1, def.start / 20), def.start * 50]; }
+function startEvent(m, kind, mult, ticks) {
+  m.ev = { kind, ticksLeft: ticks, perTick: Math.pow(mult, 1 / ticks), from: m.rate };
+}
+function stepRate(m, base, min, max, scale) {
+  scale = scale || 1;
+  let rate = m.rate, nr, started = null, ended = null;
+  if (m.ev && m.ev.ticksLeft > 0) {
+    // идёт событие: двигаемся к цели с рваными свечами
+    nr = rate * m.ev.perTick * Math.exp((Math.random() * 2 - 1) * MKT.noise * 2.5);
+    if (--m.ev.ticksLeft <= 0) {
+      ended = { kind: m.ev.kind, from: m.ev.from };
+      const wasPump = m.ev.kind === 'pump';
+      m.ev = null;
+      // после пампа часто идёт слив: отдаём 40–90% роста
+      if (wasPump && Math.random() < MKT.afterPumpDump) {
+        const gain = nr / ended.from, keep = rnd(0.1, 0.6);
+        const target = Math.pow(gain, keep) / gain; // доля, до которой падаем
+        m.pendingDump = { mult: Math.max(0.05, target), delay: Math.floor(rnd(2, 20)) };
+      }
+    }
+  } else if (m.pendingDump && --m.pendingDump.delay <= 0) {
+    startEvent(m, 'dump', m.pendingDump.mult, Math.floor(rnd(3, 14)));
+    m.pendingDump = null; started = 'dump';
+    nr = rate;
+  } else if (Math.random() < MKT.pumpChance * scale) {
+    startEvent(m, 'pump', pumpTarget(), Math.floor(rnd(8, 48)));   // 2–12 минут роста
+    started = 'pump'; nr = rate;
+  } else if (Math.random() < MKT.crashChance * scale) {
+    startEvent(m, 'crash', rnd(0.2, 0.7), Math.floor(rnd(3, 16)));  // −30…−80% за 1–4 минуты
+    started = 'crash'; nr = rate;
+  } else if (Math.random() < MKT.spikeChance * scale) {
+    nr = rate * (1 + (Math.random() < 0.5 ? -1 : 1) * rnd(0.06, 0.25));
+  } else {
+    if (Math.random() < MKT.trendChance || typeof m.trend !== 'number') m.trend = (Math.random() * 2 - 1) * MKT.trendMax;
+    const noise = (Math.random() + Math.random() + Math.random() - 1.5) * MKT.noise * 1.4;
+    nr = rate * Math.exp(m.trend + noise - Math.log(rate / base) * MKT.revert);
+  }
+  if (nr >= max || nr <= min) { if (m.ev) m.ev = null; m.trend = 0; }
+  m.rate = r2(Math.min(max, Math.max(min, nr)));
+  return { rate: m.rate, started, ended };
+}
+function eventNews(name, target, res, prevRate) {
+  if (res.started === 'pump') addNews('🔥 АЖИОТАЖ', name + ': начинается памп! Покупатели сметают всё.', target, pct(prevRate, res.rate));
+  else if (res.started === 'crash') addNews('🚨 ПАНИКА', name + ': начинается обвал, все бегут к выходу.', target, pct(prevRate, res.rate));
+  else if (res.started === 'dump') addNews('📉 ФИКСАЦИЯ ПРИБЫЛИ', name + ': киты сливают после пампа.', target, pct(prevRate, res.rate));
+  if (res.ended) {
+    const k = res.rate / res.ended.from, total = pct(res.ended.from, res.rate);
+    if (k >= 1) addNews('🚀 ПАМП ЗАВЕРШЁН', name + ' вырос в ' + (Math.round(k * 10) / 10).toLocaleString('ru-RU') + ' раза!', target, total);
+    else addNews('💥 ОБВАЛ', name + ' упал на ' + Math.round((1 - k) * 100) + '%.', target, total);
+  }
+}
+function assetBounds(def) { return [Math.max(1, def.start / 50), def.start * 200]; }
 
 function addNews(title, text, target, change) {
   const entry = { id:genId(), ts:Date.now(), title, text, target, change };
@@ -327,29 +406,34 @@ function tickMarket() {
   try {
     const now = Date.now();
     velosipe.prevRate = velosipe.rate;
-    const v = stepRate(velosipe.rate, VLP_START_RATE, VLP_MIN_RATE, VLP_MAX_RATE, 0.0001);
-    velosipe.rate = v.rate; seriesPush(velosipe.series, v.rate, now);
-    if (v.jump) {
-      const c = pct(velosipe.prevRate, v.rate);
-      addNews(c > 0 ? '🚀 ПАМП VELO$IPE' : '📉 ДАМП VELO$IPE', c > 0 ? 'Курс $VLP резко взлетел. Рынок в панике.' : 'Курс $VLP резко рухнул. Рынок в панике.', 'vlp', c);
-    }
+    const v = stepRate(velosipe, VLP_START_RATE, VLP_MIN_RATE, VLP_MAX_RATE, 1);
+    seriesPush(velosipe.series, v.rate, now);
+    eventNews('VELO$IPE', 'vlp', v, velosipe.prevRate);
     for (const def of ASSET_DEFS) {
       const a = assetsMarket.get(def.id), [mn, mx] = assetBounds(def);
       a.prevRate = a.rate;
-      const s = stepRate(a.rate, def.start, mn, mx, 0.00008);
-      a.rate = s.rate; seriesPush(a.series, s.rate, now);
-      if (s.jump) { const c = pct(a.prevRate, s.rate); addNews(c > 0 ? '📈 РЕЗКИЙ РОСТ' : '📉 РЕЗКОЕ ПАДЕНИЕ', def.name + (c > 0 ? ' внезапно взлетел.' : ' внезапно обвалился.'), def.id, c); }
+      const s = stepRate(a, def.start, mn, mx, 1);
+      seriesPush(a.series, s.rate, now);
+      eventNews(def.name, def.id, s, a.prevRate);
     }
-    broadcastAll(null, { type:'velosipe_tick', t:now, market:marketLive(), assets:assetsLive() });
+    for (const def of GIFT_DEFS_TRADABLE()) {
+      const g = giftMarket.get(def.id); if (!g) continue;
+      const [mn, mx] = giftBounds(def);
+      g.prevRate = g.rate;
+      const s = stepRate(g, def.price, mn, mx, 0.7);
+      seriesPush(g.series, s.rate, now);
+      eventNews('🎁 ' + def.name, 'gift_' + def.id, s, g.prevRate);
+    }
+    broadcastAll(null, { type:'velosipe_tick', t:now, market:marketLive(), assets:assetsLive(), gifts:giftsLive() });
   } catch (e) { console.error('tickMarket error:', e.message); }
 }
 function randomNewsEvent() {
   try {
-    if (Math.random() > 0.015) return; // в среднем одна новость примерно раз в 30 минут
+    if (Math.random() > 0.04) return; // в среднем одна новость примерно раз в 12 минут
     const t = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
     if (t.target === 'vlp' && Math.random() < 0.6) return; // новости про сам $VLP — реже
     const dir = t.dir || (Math.random() < 0.5 ? -1 : 1);
-    const change = shock(t.target, dir * (t.min + Math.random() * (t.max - t.min)));
+    const change = shock(t.target, dir * (t.min + Math.random() * (t.max - t.min)) * 1.6);
     addNews(t.title, t.text, t.target, change);
   } catch (e) { console.error('randomNewsEvent error:', e.message); }
 }
@@ -376,6 +460,27 @@ function assetsFull(period) {
              periodChange:periodChangeOf(pts), spark:decimate(pts, 36).map(p => p.r) }; // spark — мини-график для карточки
   });
 }
+function giftsLive() {
+  const o = {};
+  for (const def of GIFT_DEFS_TRADABLE()) {
+    const g = giftMarket.get(def.id); if (!g) continue;
+    o[def.id] = { rate:g.rate, prevRate:g.prevRate, change:pct(g.prevRate, g.rate), buy:gmBuyPrice(g), sell:gmSellPrice(g), stock: def.limited ? (g.stock || 0) : null };
+  }
+  return o;
+}
+function giftsFull(period) {
+  const live = giftsLive();
+  return GIFT_DEFS_TRADABLE().map(def => {
+    const g = giftMarket.get(def.id), pts = seriesPoints(g.series, period);
+    return { id:def.id, name:def.name, price:def.price, limited:!!def.limited, ...live[def.id],
+             periodChange:periodChangeOf(pts), spark:decimate(pts, 36).map(p => p.r) };
+  });
+}
+function listingsView() {
+  return nftListings.map(l => ({ id:l.id, sellerId:l.sellerId, sellerName:l.sellerName, price:l.price, ts:l.ts,
+    nft:{ giftId:l.nft.giftId, giftName:l.nft.giftName, nftTag:l.nft.nftTag, nftNumber:l.nft.nftNumber, nftModel:l.nft.nftModel,
+          nftModelName:l.nft.nftModelName, nftGradient:l.nft.nftGradient, nftGradientName:l.nft.nftGradientName } }));
+}
 function positionView(p) {
   const a = assetsMarket.get(p.assetId), def = assetDef(p.assetId);
   const value = Math.floor(p.units * a.rate), pnl = value - p.cost;
@@ -395,7 +500,7 @@ function velosipeSnapshot(uid, period) {
   if (!VLP_PERIODS[period]) period = '1d';
   return { type:'velosipe_market', period, market:marketFull(period), assets:assetsFull(period), me:meView(uid),
            positions:positionsOf(uid).map(positionView), trades:(velosipeTrades.get(uid) || []).slice(-60).reverse(),
-           news:marketNews.slice(0, 40) };
+           news:marketNews.slice(0, 40), gifts:giftsFull(period), listings:listingsView() };
 }
 function releaseUserVelosipe(uid) { // при удалении аккаунта монеты возвращаются в резерв
   const rec = userVelosipe.get(uid);
@@ -407,7 +512,8 @@ function releaseUserVelosipe(uid) { // при удалении аккаунта 
 function serializeVelosipe() {
   const mapObj = m => { const o = {}; for (const [k, v] of m) o[k] = v; return o; };
   const assets = {}; for (const [id, a] of assetsMarket) assets[id] = a;
-  return { market:velosipe, users:mapObj(userVelosipe), trades:mapObj(velosipeTrades), positions:mapObj(userPositions), assets, news:marketNews };
+  return { market:velosipe, users:mapObj(userVelosipe), trades:mapObj(velosipeTrades), positions:mapObj(userPositions), assets, news:marketNews,
+           giftMarket:mapObj(giftMarket), nftListings };
 }
 function loadVelosipe(d) {
   if (!d) return;
@@ -417,6 +523,9 @@ function loadVelosipe(d) {
   for (const [k, v] of Object.entries(d.positions || {})) userPositions.set(k, v);
   for (const [id, a] of Object.entries(d.assets || {})) if (assetsMarket.has(id) && a.series) assetsMarket.set(id, a);
   if (Array.isArray(d.news)) { marketNews.length = 0; marketNews.push(...d.news); }
+  for (const [id, g] of Object.entries(d.giftMarket || {})) if (g && g.series) giftMarket.set(id, g);
+  if (Array.isArray(d.nftListings)) { nftListings.length = 0; nftListings.push(...d.nftListings); }
+  ensureGiftMarket();
   // самолечение: резерв всегда = тираж − всё, что на руках и в инвестициях
   let held = 0;
   for (const rec of userVelosipe.values()) held += rec.balance;
@@ -438,7 +547,7 @@ function saveNow() {
     const usersArr = [...users.values()].map(u => ({
       id:u.id, name:u.name, phone:u.phone, initials:u.initials, color:u.color,
       avatarUrl:u.avatarUrl||null, username:u.username||null, wornNft:u.wornNft||null, nameBadge:u.nameBadge||null,
-      profileBg:u.profileBg||null, cloudPwd:u.cloudPwd||null, tokens:u.tokens||[],
+      profileBg:u.profileBg||null, bio:u.bio||'', cloudPwd:u.cloudPwd||null, tokens:u.tokens||[],
       verifiedOrg:u.verifiedOrg||null, pushDevices:u.pushDevices||null,
     }));
     const messagesObj = {};
@@ -715,6 +824,22 @@ function dropPushDevice(uid, deviceId) {
 }
 
 // ── Звёзды: баланс считает только сервер ──
+/**
+ * Следующий номер NFT для подарка: самый маленький номер, которого ещё нет ни у одного NFT
+ * (у пользователей и каналов). Номера, выданные вручную через /nft (например #666),
+ * не сдвигают счёт: обычные улучшения идут дальше по порядку и просто пропускают занятые.
+ */
+function nextFreeNftNumber(giftId) {
+  const used = new Set();
+  for (const list of [...userGifts.values(), ...channelGifts.values()]) {
+    for (const g of list || []) if (g && g.isNft && g.giftId === giftId && g.nftNumber) used.add(Number(g.nftNumber));
+  }
+  let n = 1;
+  while (used.has(n)) n++;
+  nftCounters.set(giftId, Math.max(nftCounters.get(giftId) || 0, n));
+  return n;
+}
+
 function starsOf(uid) { return userStars.get(uid) || 0; }
 function trySpendStars(uid, cost) {
   const bal = starsOf(uid);
@@ -1193,7 +1318,6 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
       || (src && src.nftModel ? { id: src.nftModel, name: src.nftModelName } : giftModels[Math.floor(Math.random() * giftModels.length)]);
     const gradient = pickedGradient
       || (src && src.nftGradient ? { css: src.nftGradient, name: src.nftGradientName } : NFT_GRADIENTS[Math.floor(Math.random() * NFT_GRADIENTS.length)]);
-    if ((nftCounters.get(def.id) || 0) < num) nftCounters.set(def.id, num);
     const now = Date.now();
     const nft = {
       giftId: def.id, giftName: def.name, giftPrice: def.price,
@@ -1249,9 +1373,7 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     const addedNfts = [];
 
     for (let i = 0; i < dupeCount; i++) {
-      const prevCount = nftCounters.get(sourceNft.giftId) || 0;
-      const newNumber = prevCount + 1;
-      nftCounters.set(sourceNft.giftId, newNumber);
+      const newNumber = nextFreeNftNumber(sourceNft.giftId);
       const tagBase = (sourceNft.giftName || sourceNft.giftId).replace(/[^a-zA-Z0-9]/g, '');
       const clone = {
         ...sourceNft,
@@ -1378,7 +1500,7 @@ function sanitizeUser(u) {
   return { id:u.id, name:u.name, initials:u.initials, phone:u.phone, color:u.color,
            online:u.online, avatarUrl:u.avatarUrl||null, username:u.username||null,
            wornNft: u.wornNft||null, nameBadge: nb, verifiedOrg: u.verifiedOrg||null,
-           profileBg: u.profileBg||null,
+           profileBg: u.profileBg||null, bio: u.bio||'',
            isSuperUser: superUsers.has(u.id) };
 }
 
@@ -2275,6 +2397,17 @@ server.on('upgrade', (req, socket) => {
         break;
       }
 
+      case 'update_bio': {
+        if (!userId) break;
+        const u = users.get(userId);
+        if (!u) break;
+        u.bio = String(msg.bio || '').replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 140);
+        scheduleSave();
+        send({ type:'bio_updated', bio:u.bio });
+        broadcastAll(userId, { type:'user_profile_updated', userId, bio:u.bio });
+        break;
+      }
+
       case 'update_name': {
         if (!userId) break;
         const u = users.get(userId);
@@ -2767,9 +2900,7 @@ server.on('upgrade', (req, socket) => {
         const models = NFT_MODELS_BY_GIFT[g.giftId] || NFT_MODELS_BY_GIFT.scared_cat;
         const model = models[Math.floor(Math.random() * models.length)];
         const gradient = NFT_GRADIENTS[Math.floor(Math.random() * NFT_GRADIENTS.length)];
-        const prevCount = nftCounters.get(g.giftId) || 0;
-        const nftNumber = prevCount + 1;
-        nftCounters.set(g.giftId, nftNumber);
+        const nftNumber = nextFreeNftNumber(g.giftId);
         const tagBase = (g.giftName || g.giftId).replace(/[^a-zA-Z0-9]/g, '');
         gifts[idx] = {
           ...g, isNft:true, nftModel:model.id, nftModelName:model.name,
@@ -3052,6 +3183,109 @@ server.on('upgrade', (req, socket) => {
         if (!series) break;
         const pts = seriesPoints(series, period);
         send({ type:'velosipe_history', target, period, points:decimate(pts, 240), change:periodChangeOf(pts) });
+        break;
+      }
+
+      // ── Биржа подарков ──
+      case 'gm_sell': {
+        if (!userId) break;
+        const def = GIFT_DEFS_TRADABLE().find(d => d.id === msg.giftId), g = def && giftMarket.get(def.id);
+        if (!g) { send({ type:'velosipe_error', text:'Этот подарок не торгуется на бирже' }); break; }
+        const own = userGifts.get(userId) || [];
+        // продаём самый старый экземпляр (или конкретный, если указан ts)
+        const idx = own.findIndex(x => !x.isNft && x.giftId === def.id && (msg.giftTs == null || String(x.ts) === String(msg.giftTs)));
+        if (idx === -1) { send({ type:'velosipe_error', text:'У вас нет подарка «' + def.name + '»' }); break; }
+        const sold = own.splice(idx, 1)[0];
+        const amount = gmSellPrice(g);
+        addStarsTo(userId, amount);
+        g.stock = (g.stock || 0) + 1;
+        const [mn, mx] = giftBounds(def);
+        g.rate = r2(Math.max(mn, Math.min(mx, g.rate * (1 - GM_IMPACT))));
+        addTrade(userId, { type:'gsell', assetName:def.name, giftId:def.id, amount });
+        scheduleSave();
+        send({ type:'gift_sold', giftTs:sold.ts, amount, balance:starsOf(userId), silent:true });
+        send(starsSyncMsg(userId));
+        send(velosipeSnapshot(userId, msg.period));
+        send({ type:'gm_done', text:'💰 «' + def.name + '» продан бирже за ' + amount.toLocaleString('ru-RU') + ' ⭐', kind:'divest' });
+        break;
+      }
+      case 'gm_buy': {
+        if (!userId) break;
+        const def = GIFT_DEFS_TRADABLE().find(d => d.id === msg.giftId), g = def && giftMarket.get(def.id);
+        if (!g) { send({ type:'velosipe_error', text:'Этот подарок не торгуется на бирже' }); break; }
+        if (def.limited && (g.stock || 0) <= 0) { send({ type:'velosipe_error', text:'На бирже нет «' + def.name + '». Ждите, пока кто-то продаст' }); break; }
+        const price = gmBuyPrice(g);
+        if (!trySpendStars(userId, price)) { send({ type:'velosipe_error', text:'Недостаточно звёзд: нужно ' + price.toLocaleString('ru-RU') + ' ⭐' }); break; }
+        if (def.limited) g.stock--;
+        const [mn, mx] = giftBounds(def);
+        g.rate = r2(Math.max(mn, Math.min(mx, g.rate * (1 + GM_IMPACT))));
+        const entry = { giftId:def.id, giftName:def.name, giftPrice:def.price, fromId:'exchange', fromName:'Биржа VELO$IPE', msg:'', ts:Date.now() };
+        if (!userGifts.has(userId)) userGifts.set(userId, []);
+        userGifts.get(userId).push(entry);
+        addTrade(userId, { type:'gbuy', assetName:def.name, giftId:def.id, amount:price });
+        scheduleSave();
+        send({ type:'gift_delivered', toId:userId, gift:entry });
+        send(starsSyncMsg(userId));
+        send(velosipeSnapshot(userId, msg.period));
+        send({ type:'gm_done', text:'🎁 Куплен «' + def.name + '» за ' + price.toLocaleString('ru-RU') + ' ⭐', kind:'buy' });
+        break;
+      }
+      // ── NFT-маркет (между игроками) ──
+      case 'nft_list': {
+        if (!userId) break;
+        const price = toInt(msg.price);
+        if (!price) { send({ type:'velosipe_error', text:'Укажите цену в звёздах' }); break; }
+        const own = userGifts.get(userId) || [];
+        const idx = own.findIndex(x => x.isNft && String(x.ts) === String(msg.giftTs));
+        if (idx === -1) { send({ type:'velosipe_error', text:'NFT не найден' }); break; }
+        const me = users.get(userId);
+        if (me && me.wornNft && String(me.wornNft.ts) === String(own[idx].ts)) { send({ type:'velosipe_error', text:'Сначала снимите этот NFT (кнопка «Носится»)' }); break; }
+        const nft = own.splice(idx, 1)[0];
+        nftListings.unshift({ id:genId(), sellerId:userId, sellerName:me ? me.name : '—', price, ts:Date.now(), nft });
+        scheduleSave();
+        send({ type:'gift_removed', giftTs:nft.ts });
+        broadcastAll(null, { type:'nft_listings', listings:listingsView() });
+        send({ type:'gm_done', text:'🏷 ' + (nft.giftName || 'NFT') + ' ' + (nft.nftTag || '') + ' выставлен за ' + price.toLocaleString('ru-RU') + ' ⭐', kind:'invest' });
+        break;
+      }
+      case 'nft_unlist': {
+        if (!userId) break;
+        const li = nftListings.findIndex(l => l.id === msg.listingId && l.sellerId === userId);
+        if (li === -1) { send({ type:'velosipe_error', text:'Лот не найден' }); break; }
+        const l = nftListings.splice(li, 1)[0];
+        if (!userGifts.has(userId)) userGifts.set(userId, []);
+        userGifts.get(userId).push(l.nft);
+        scheduleSave();
+        send({ type:'gift_delivered', toId:userId, gift:l.nft });
+        broadcastAll(null, { type:'nft_listings', listings:listingsView() });
+        send({ type:'gm_done', text:'↩️ NFT снят с продажи и вернулся в профиль', kind:'sell' });
+        break;
+      }
+      case 'nft_buy': {
+        if (!userId) break;
+        const li = nftListings.findIndex(l => l.id === msg.listingId);
+        if (li === -1) { send({ type:'velosipe_error', text:'Этот NFT уже купили' }); break; }
+        const l = nftListings[li];
+        if (l.sellerId === userId) { send({ type:'velosipe_error', text:'Это ваш лот' }); break; }
+        if (!trySpendStars(userId, l.price)) { send({ type:'velosipe_error', text:'Недостаточно звёзд: нужно ' + l.price.toLocaleString('ru-RU') + ' ⭐' }); break; }
+        nftListings.splice(li, 1);
+        addStarsTo(l.sellerId, l.price);
+        const nft = { ...l.nft, nftOwnerId:userId, fromId:l.sellerId, fromName:l.sellerName };
+        if (!userGifts.has(userId)) userGifts.set(userId, []);
+        userGifts.get(userId).push(nft);
+        const lotName = (nft.giftName || 'NFT') + ' ' + (nft.nftTag || '');
+        addTrade(userId, { type:'nbuy', assetName:lotName, amount:l.price });
+        addTrade(l.sellerId, { type:'nsell', assetName:lotName, amount:l.price });
+        scheduleSave();
+        send({ type:'gift_delivered', toId:userId, gift:nft });
+        send(starsSyncMsg(userId));
+        const seller = users.get(l.sellerId);
+        if (seller && isSocketOpen(seller.ws)) {
+          safeSend(seller.ws, starsSyncMsg(l.sellerId));
+          safeSend(seller.ws, { type:'gm_done', text:'💸 Ваш ' + lotName + ' купили за ' + l.price.toLocaleString('ru-RU') + ' ⭐', kind:'divest' });
+        }
+        broadcastAll(null, { type:'nft_listings', listings:listingsView() });
+        send({ type:'gm_done', text:'✨ Куплен ' + lotName + ' за ' + l.price.toLocaleString('ru-RU') + ' ⭐', kind:'buy' });
         break;
       }
 

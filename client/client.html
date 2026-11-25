@@ -2117,6 +2117,18 @@ html.dark .ep-mode-tab:hover{background:#1a1a1a}
 .vx-aright{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .vx-spark{display:block;width:96px;height:36px}
 .vx-chg{font-size:12.5px;font-weight:800}
+.vx-gcard{cursor:default}
+.vx-gbtns{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vx-gbtns i{font-style:normal;opacity:.8}
+.vx-nft{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;padding:12px;border-radius:20px;background:var(--glass);border:1px solid var(--line)}
+.vx-nft-mine{grid-template-columns:64px 1fr}
+.vx-nft-art{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px}
+.vx-nft-info{min-width:0;display:flex;flex-direction:column;gap:2px}
+.vx-nft-info b{color:#fff;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vx-nft-info b span{color:var(--mut);font-weight:600}
+.vx-nft-info small{color:var(--mut);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vx-nft-sell{display:flex;gap:8px;margin-top:6px}
+.vx-nft-sell input{flex:1;min-width:0;background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:#fff;font:inherit;font-size:13px;outline:none}
+.vx-nft-sell input:focus{border-color:rgba(255,255,255,.3)}
 .vx-pos{padding:16px;border-radius:20px;background:var(--glass);border:1px solid var(--line);margin-bottom:12px}
 .vx-pos .top{display:flex;align-items:center;gap:12px}.vx-pos .top .nm{flex:1;min-width:0}.vx-pos .top b{font-size:15px;display:block}.vx-pos .top small{color:var(--mut);font-size:12px}
 .vx-pos .row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);margin:12px 0}
@@ -2986,6 +2998,10 @@ html.dark .folder-ind{background:var(--accent)}
 #giftViewModal .gvm-desc a:hover{text-decoration:underline}
 #giftViewModal .gvm-caption{margin-top:12px;padding:8px 12px;border-radius:8px;background:#1e2936;font-size:13px;line-height:18px;color:#fff;text-align:center;word-break:break-word;white-space:pre-wrap}
 #giftViewModal .gvm-body{padding:16px 24px 22px}
+.bio-text{white-space:pre-wrap;word-break:break-word;line-height:1.4}
+.bio-text.bio-empty{color:var(--text2)}
+.bio-input{width:100%;resize:vertical;min-height:64px;font-family:inherit;line-height:1.4;box-sizing:border-box}
+.bio-hint{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--text2);margin-top:4px}
 .nt-msg{margin:8px 12px 0;padding:6px 10px;border-radius:10px;background:rgba(0,0,0,.22);color:#fff;font-size:13px;line-height:17px;text-align:center;word-break:break-word;white-space:pre-wrap}
 #giftViewModal .gvm-table{border:1px solid #2a3846;border-radius:8px;overflow:hidden}
 #giftViewModal .gvm-trow{display:flex;height:38px}
@@ -4060,6 +4076,7 @@ function handleWS(msg) {
         if (msg.wornNft  !== undefined) upC.wornNft  = msg.wornNft || null;
         if (msg.initials !== undefined) upC.initials = msg.initials;
         if (msg.profileBg !== undefined) { upC.profileBg = msg.profileBg || null; repaintContactHero(msg.userId); }
+        if (msg.bio !== undefined) { upC.bio = msg.bio || ''; renderContactBio(msg.userId); }
       }
       break;
     }
@@ -4180,6 +4197,8 @@ function handleWS(msg) {
       const info = msg.user;
       if (!info) break;
       addOrUpdateContact(info);
+      if (info.id === myUser?.id && info.bio !== undefined) { myUser.bio = info.bio || ''; renderMyBio(); }
+      renderContactBio(info.id);
       // If contact profile is open for this user — re-render avatar + hero
       const cpOv = document.getElementById('contactProfileOverlay');
       if (cpOv?.classList.contains('open') && cpOv.dataset.userId === info.id) {
@@ -4332,6 +4351,13 @@ function handleWS(msg) {
     }
 
     case 'gift_sold': { onGiftSold(msg); break; }
+    case 'gift_removed': { onGiftSold({ giftTs: msg.giftTs, silent: true }); break; }
+    case 'bio_updated': {
+      if (myUser) myUser.bio = msg.bio || '';
+      renderMyBio();
+      showToast('Профиль', 'Информация «О себе» сохранена', '✅');
+      break;
+    }
     case 'gift_sell_failed': {
       showToast('Ошибка', msg.text || 'Не удалось продать подарок', '⚠️', '#e74c3c');
       const sb = document.getElementById('gvmSellBtn');
@@ -4648,7 +4674,7 @@ function handleWS(msg) {
     }
 
     case 'velosipe_market': case 'velosipe_trade_ok': case 'velosipe_error':
-    case 'velosipe_history': case 'velosipe_tick': case 'velosipe_limit': case 'market_news':
+    case 'velosipe_history': case 'velosipe_tick': case 'velosipe_limit': case 'market_news': case 'nft_listings': case 'gm_done':
       vlpHandle(msg); break;
 
     case 'stars_unlim': {
@@ -4977,6 +5003,7 @@ function addOrUpdateContact(u) {
     if (u.nameBadge  !== undefined) existing.nameBadge = u.nameBadge || null;
     if (u.verifiedOrg !== undefined) existing.verifiedOrg = u.verifiedOrg || null;
     if (u.profileBg  !== undefined) existing.profileBg = u.profileBg || null;
+    if (u.bio        !== undefined) existing.bio = u.bio || '';
   } else {
     contacts.set(u.id, Object.assign({messages:[], lastMsg:'', time:'', unread:0, type:'user', status:'Был в сети недавно'}, u));
   }
@@ -7954,7 +7981,7 @@ function onGiftSold(msg) {
     updateStarsUI();
   }
   if (giftViewCurrentGift && String(giftViewCurrentGift.ts) === String(msg.giftTs)) closeGiftView();
-  showToast('Подарки', 'Подарок продан: +' + (msg.amount || 0).toLocaleString('ru-RU') + ' звёзд', '⭐');
+  if (!msg.silent) showToast('Подарки', 'Подарок продан: +' + (msg.amount || 0).toLocaleString('ru-RU') + ' звёзд', '⭐');
   const gw = document.getElementById('profileGiftsWrap');
   if (gw && document.getElementById('profileOverlay')?.classList.contains('open')) {
     gw.innerHTML = '';
@@ -8867,6 +8894,7 @@ function openProfile() {
   if (_sel('profileNameEditWrap')) _sel('profileNameEditWrap').style.display = 'none';
   if (_sel('nameEditBtn')) _sel('nameEditBtn').style.display = '';
   if (_sel('usernameDisplay'))  _sel('usernameDisplay').textContent  = myUsername ? '@' + myUsername : 'Не задан';
+  cancelBioEdit(); renderMyBio();
   // Verification badge
   const pvb = document.getElementById('profileVerifiedBadge');
   if (pvb) {
@@ -8939,6 +8967,43 @@ function cancelNameEdit() {
   const btn  = document.getElementById('nameEditBtn');
   if (wrap) wrap.style.display = 'none';
   if (btn)  btn.style.display  = '';
+}
+
+// ── «О себе» ──
+function renderMyBio() {
+  const d = document.getElementById('bioDisplay'); if (!d) return;
+  const bio = (myUser && myUser.bio) || '';
+  d.textContent = bio || 'Не указано';
+  d.classList.toggle('bio-empty', !bio);
+}
+function startBioEdit() {
+  const wrap = document.getElementById('bioEditWrap'), view = document.getElementById('bioView'), inp = document.getElementById('bioInput');
+  if (!wrap || !inp) return;
+  inp.value = (myUser && myUser.bio) || '';
+  document.getElementById('bioCount').textContent = 140 - inp.value.length;
+  wrap.style.display = ''; view.style.display = 'none';
+  inp.focus();
+}
+function cancelBioEdit() {
+  const wrap = document.getElementById('bioEditWrap'), view = document.getElementById('bioView');
+  if (wrap) wrap.style.display = 'none';
+  if (view) view.style.display = 'flex';
+}
+function saveBioEdit() {
+  const inp = document.getElementById('bioInput'); if (!inp) return;
+  const bio = inp.value.replace(/\n{3,}/g, '\n\n').trim().slice(0, 140);
+  cancelBioEdit();
+  if (bio === ((myUser && myUser.bio) || '')) return;
+  wsSend({ type:'update_bio', bio });
+}
+function renderContactBio(userId, force) {
+  const ov = document.getElementById('contactProfileOverlay');
+  if (!force && !(ov && ov.classList.contains('open') && ov.dataset.userId === userId)) return;
+  const c = contacts.get(userId), row = document.getElementById('cpBioRow'), el = document.getElementById('cpBio');
+  if (!row || !el) return;
+  const bio = (c && c.bio) || '';
+  el.textContent = bio;
+  row.style.display = bio ? '' : 'none';
 }
 
 function saveNameEdit() {
@@ -9659,6 +9724,7 @@ function openContactProfile(userId) {
   // Phone (only show if we know it)
   const phoneEl = document.getElementById('cpPhone');
   phoneEl.textContent = c.phone || 'Скрыт';
+  renderContactBio(userId, true);
 
   // Store userId on overlay for later updates
   const cpOvrl = document.getElementById('contactProfileOverlay');
@@ -9935,6 +10001,27 @@ function closeContactProfile() {
           <div class="pr-value" id="profileUsername">
             <span id="usernameDisplay">Не задан</span>
             <span class="pr-edit-btn" id="usernameEditBtn" onclick="startUsernameEdit()"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/><path d="M14.5 5.5l3 3"/></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-section">
+      <div class="profile-row" id="bioRow">
+        <div class="pr-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg></div>
+        <div class="pr-info">
+          <div class="pr-label">О себе</div>
+          <div class="pr-value" id="bioView" style="display:flex;align-items:flex-start;gap:6px">
+            <span id="bioDisplay" class="bio-text">Не указано</span>
+            <span class="pr-edit-btn" onclick="startBioEdit()"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/><path d="M14.5 5.5l3 3"/></svg></span>
+          </div>
+          <div id="bioEditWrap" style="display:none;margin-top:6px">
+            <textarea id="bioInput" class="username-input bio-input" maxlength="140" rows="3" placeholder="Пара слов о себе…" oninput="document.getElementById('bioCount').textContent=140-this.value.length"></textarea>
+            <div class="bio-hint">Любые подробности: возраст, род занятий или город. <span id="bioCount">140</span></div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <button class="username-save-btn" onclick="saveBioEdit()">Сохранить</button>
+              <button class="username-cancel-btn" onclick="cancelBioEdit()">Отмена</button>
+            </div>
           </div>
         </div>
       </div>
@@ -10229,6 +10316,10 @@ function closeContactProfile() {
     </div>
     <div class="cp-gap"></div>
     <div class="cp-section">
+      <div class="cp-row" id="cpBioRow" style="display:none"><div class="cp-row-info">
+        <div class="cp-row-value bio-text" id="cpBio"></div>
+        <div class="cp-row-label">О себе</div>
+      </div></div>
       <div class="cp-row"><div class="cp-row-info">
         <div class="cp-row-value" id="cpPhone"></div>
         <div class="cp-row-label">Мобильный</div>
@@ -10257,7 +10348,7 @@ const VLP = { open:false, tab:'market', period:'1d', loaded:false, market:null, 
               flash:0, enter:true, built:null, tickerBuilt:false, newsId:null, firstData:true };
 const VLP_PERIODS = [['1h','1 ч'],['1d','1 д'],['1w','1 нед'],['1m','1 мес'],['all','Всё']];
 const PERIOD_LABEL = { '1h':'1 час', '1d':'1 день', '1w':'неделю', '1m':'месяц', 'all':'всё время' };
-const VLP_TABS = [['market','Рынок'],['assets','Активы'],['portfolio','Портфель'],['history','История'],['news','Новости']];
+const VLP_TABS = [['market','Рынок'],['assets','Активы'],['gifts','Подарки'],['portfolio','Портфель'],['history','История'],['news','Новости']];
 const $ = id => document.getElementById(id);
 const vEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const vN = n => Math.round(n).toLocaleString('ru-RU');
@@ -10545,7 +10636,7 @@ function renderPane(opts) {
   }
   if (VLP.chart) { VLP.chart.destroy(); VLP.chart = null; }
   const sc = body.scrollTop;
-  body.innerHTML = VLP.market ? ({ assets:paneAssets, portfolio:panePortfolio, history:paneHistory, news:paneNews })[VLP.tab]()
+  body.innerHTML = VLP.market ? ({ assets:paneAssets, gifts:paneGifts, portfolio:panePortfolio, history:paneHistory, news:paneNews })[VLP.tab]()
                               : '<div class="vlx-wrap"><div class="vx-skel"></div><div class="vx-skel"></div><div class="vx-skel"></div></div>';
   if (!VLP.enter) body.scrollTop = sc;
   VLP.built = VLP.tab; if (VLP.market) VLP.enter = false;
@@ -10654,6 +10745,72 @@ function paneAssets() {
     <div class="vx-assets">${list.map(assetCard).join('')}</div></div>`;
 }
 
+// ── вкладка «Подарки»: курс подарков + NFT-маркет ──
+function vlpMyGifts() { return (myUser && receivedGifts[myUser.id]) || []; }
+function vlpGiftCount(id) { return vlpMyGifts().filter(g => !g.isNft && g.giftId === id).length; }
+function vlpRerenderGifts(force) {
+  // не перерисовываем, пока человек вводит цену — иначе введённое пропадёт
+  const ae = document.activeElement;
+  if (!force && ae && ae.closest && ae.closest('#vlpBody') && ae.tagName === 'INPUT') return;
+  VLP.enter = false; renderPane({});
+}
+function giftMarketCard(g, i) {
+  const ch = vlpLiveChange({ id:'g_' + g.id, rate:g.rate, periodChange:g.periodChange }), own = vlpGiftCount(g.id);
+  const stock = g.stock == null ? 'всегда в наличии' : g.stock > 0 ? 'на бирже ' + vN(g.stock) + ' шт.' : 'на бирже нет';
+  return `<div class="vx-asset vx-gcard ${vCls(ch)}${vIn()}"${vSt(i)}>
+    <div class="vx-aico">${GIFT_FALLBACK_EMOJI[g.id] || '🎁'}</div>
+    <div class="vx-ainfo"><b>${vEsc(g.name)}</b><small>${stock} · магазин ${vN(g.price)} ⭐</small><div class="vx-aprice">${v2(g.rate)} ${vStar()}</div></div>
+    <div class="vx-aright">${vxSpark(g.spark, ch >= 0)}<span class="vx-chg ${vCls(ch)}">${vArrow(ch)} ${vPct(ch)}</span></div>
+    <div class="vx-gbtns"><button class="vx-btn buy sm" onclick="gmBuy('${g.id}')" ${g.stock === 0 ? 'disabled' : ''}>Купить · ${vN(g.buy)} ⭐</button>
+      <button class="vx-btn sell sm" onclick="gmSell('${g.id}')" ${own ? '' : 'disabled'}>Продать · ${vN(g.sell)} ⭐${own ? ' <i>×' + own + '</i>' : ''}</button></div></div>`;
+}
+function nftLotCard(l, i) {
+  const n = l.nft, mine = myUser && l.sellerId === myUser.id;
+  return `<div class="vx-nft${vIn()}"${vSt(i)}>
+    <div class="vx-nft-art" style="background:${vEsc(n.nftGradient || 'linear-gradient(135deg,#7a3cf0,#2aabee)')}">${GIFT_FALLBACK_EMOJI[n.giftId] || '✨'}</div>
+    <div class="vx-nft-info"><b>${vEsc(n.giftName)} <span>${vEsc(n.nftTag || '')}</span></b>
+      <small>${n.nftModelName ? 'Модель ' + vEsc(n.nftModelName) : ''}${n.nftGradientName ? ' · Фон ' + vEsc(n.nftGradientName) : ''}</small>
+      <small>Продавец: ${mine ? 'вы' : vEsc(l.sellerName)}</small>
+      <div class="vx-aprice">${vN(l.price)} ${vStar()}</div></div>
+    ${mine ? `<button class="vx-btn ghost sm" onclick="nftUnlist('${l.id}')">Снять</button>`
+           : `<button class="vx-btn buy sm" onclick="nftBuy('${l.id}')">Купить</button>`}</div>`;
+}
+function myNftRow(g) {
+  const key = String(g.ts), val = (VLP.listDraft && VLP.listDraft[key]) || '';
+  const worn = typeof wornNft !== 'undefined' && wornNft && String(wornNft.ts) === key;
+  return `<div class="vx-nft vx-nft-mine">
+    <div class="vx-nft-art" style="background:${vEsc(g.nftGradient || 'linear-gradient(135deg,#7a3cf0,#2aabee)')}">${GIFT_FALLBACK_EMOJI[g.giftId] || '✨'}</div>
+    <div class="vx-nft-info"><b>${vEsc(g.giftName)} <span>${vEsc(g.nftTag || '')}</span></b><small>${g.nftModelName ? 'Модель ' + vEsc(g.nftModelName) : ''}${g.nftGradientName ? ' · Фон ' + vEsc(g.nftGradientName) : ''}</small>
+      ${worn ? '<small>Сейчас носится — снимите, чтобы продать</small>' : `<div class="vx-nft-sell"><input type="number" min="1" inputmode="numeric" placeholder="Цена в ⭐" value="${vEsc(val)}" oninput="(VLP.listDraft=VLP.listDraft||{})['${key}']=this.value">
+        <button class="vx-btn sell sm" onclick="nftList('${key}', this.previousElementSibling.value)">Выставить</button></div>`}</div></div>`;
+}
+function paneGifts() {
+  const gifts = VLP.gifts || [], lots = VLP.listings || [], mine = vlpMyGifts().filter(g => g.isNft && !g.hidden);
+  return `<div class="vlx-wrap">
+    <div class="vx-card${vIn()}" style="margin-bottom:16px"><div class="vx-h">Как это работает</div><div class="vx-desc">
+      У каждого подарка свой курс в звёздах — он скачет как на бирже: пампы, обвалы, новости.
+      Покупайте подарки на просадке и продавайте бирже на пампе. Лимитированные подарки биржа продаёт только из того, что ей продали игроки.
+      NFT торгуются между игроками: выставьте свой за любую цену — звёзды придут, когда его купят.</div></div>
+    <div class="vx-h">Курс подарков</div>
+    <div class="vx-assets">${gifts.map(giftMarketCard).join('')}</div>
+    <div class="vx-h" style="margin-top:22px">NFT-маркет · ${lots.length ? vN(lots.length) + ' лот(ов)' : 'пусто'}</div>
+    ${lots.length ? `<div class="vx-assets">${lots.map(nftLotCard).join('')}</div>` : '<div class="vx-empty" style="padding:24px 12px">Пока никто не выставил NFT. Будьте первым!</div>'}
+    <div class="vx-h" style="margin-top:22px">Мои NFT — выставить на продажу</div>
+    ${mine.length ? `<div class="vx-assets">${mine.map(myNftRow).join('')}</div>` : '<div class="vx-empty" style="padding:24px 12px">У вас нет NFT. Превратите подарок в NFT или купите на маркете.</div>'}
+  </div>`;
+}
+function gmGuard() { if (VLP.gmBusy) return false; VLP.gmBusy = true; setTimeout(() => { VLP.gmBusy = false; }, 4000); return true; }
+function gmBuy(id) { if (gmGuard()) wsSend({ type:'gm_buy', giftId:id, period:VLP.period }); }
+function gmSell(id) { if (gmGuard()) wsSend({ type:'gm_sell', giftId:id, period:VLP.period }); }
+function nftList(ts, price) {
+  const n = Math.floor(Number(price));
+  if (!n || n < 1) { showToast('Биржа подарков', 'Укажите цену в звёздах', 'logo', '#ff5c5c'); return; }
+  if (VLP.listDraft) delete VLP.listDraft[ts];
+  if (gmGuard()) wsSend({ type:'nft_list', giftTs:ts, price:n });
+}
+function nftUnlist(id) { if (gmGuard()) wsSend({ type:'nft_unlist', listingId:id }); }
+function nftBuy(id) { if (gmGuard()) wsSend({ type:'nft_buy', listingId:id }); }
+
 // ── вкладка «Портфель» ──
 function panePortfolio() {
   const me = liveMe(), pos = VLP.positions.map(livePos), rate = VLP.market.rate;
@@ -10687,6 +10844,8 @@ function paneHistory() {
     let ic, t1, t2, am;
     if (t.type === 'buy') { ic = svgIc('trendUp',20); t1 = `Куплено ${vN(t.amount)} $VLP`; t2 = `по ${v2(t.rate)} ⭐`; am = `<span class="down">−${vN(t.stars)}</span> ${vStar()}`; }
     else if (t.type === 'sell') { ic = svgIc('trendDown',20); t1 = `Продано ${vN(t.amount)} $VLP`; t2 = `по ${v2(t.rate)} ⭐`; am = `<span class="up">+${vN(t.stars)}</span> ${vStar()}`; }
+    else if (t.type === 'gbuy' || t.type === 'nbuy') { ic = t.giftId ? (GIFT_FALLBACK_EMOJI[t.giftId] || '🎁') : '✨'; t1 = (t.type === 'gbuy' ? 'Куплен подарок: ' : 'Куплен NFT: ') + vEsc(t.assetName); t2 = t.type === 'gbuy' ? 'у биржи' : 'на NFT-маркете'; am = `<span class="down">−${vN(t.amount)}</span> ${vStar()}`; }
+    else if (t.type === 'gsell' || t.type === 'nsell') { ic = t.giftId ? (GIFT_FALLBACK_EMOJI[t.giftId] || '🎁') : '💸'; t1 = (t.type === 'gsell' ? 'Продан подарок: ' : 'Продан NFT: ') + vEsc(t.assetName); t2 = t.type === 'gsell' ? 'бирже' : 'на NFT-маркете'; am = `<span class="up">+${vN(t.amount)}</span> ${vStar()}`; }
     else if (t.type === 'invest') { ic = t.icon || svgIc('briefcase',20); t1 = `Инвестиция: ${vEsc(t.assetName)}`; t2 = 'вложено'; am = `<span class="down">−${vN(t.amount)}</span> ${vCur(t.currency)}`; }
     else { ic = t.icon || svgIc('coin',20); t1 = `Продажа: ${vEsc(t.assetName)}`; t2 = `<span class="${vCls(t.pnl)}">${t.pnl >= 0 ? 'прибыль +' : 'убыток −'}${vN(Math.abs(t.pnl))}</span>`; am = `<span class="up">+${vN(t.amount)}</span> ${vCur(t.currency)}`; }
     return `<div class="vx-row"><div class="bd">${ic}</div><div class="mid"><div class="t1">${t1}</div><div class="t2">${t2} · ${vDate(t.ts)}</div></div><div class="am">${am}</div></div>`;
@@ -10844,6 +11003,8 @@ function vlpApply(m) {
   VLP.market = m.market; VLP.assets = m.assets; VLP.me = m.me; VLP.positions = m.positions; VLP.trades = m.trades; VLP.news = m.news; VLP.period = m.period; VLP.loaded = true;
   VLP.base = { vlp: m.market.rate / (1 + m.market.periodChange / 100) };
   m.assets.forEach(a => { VLP.base[a.id] = a.rate / (1 + a.periodChange / 100); });
+  VLP.gifts = m.gifts || []; VLP.listings = m.listings || [];
+  VLP.gifts.forEach(g => { VLP.base['g_' + g.id] = g.rate / (1 + (g.periodChange || 0) / 100); });
 }
 /* Общий дневной лимит: обновляем у всех сразу, не сбрасывая введённое в окне покупки */
 function vlpBuySub(m, me) {
@@ -10880,6 +11041,7 @@ function vlpHandle(msg) {
       break;
     }
     case 'velosipe_error':
+      VLP.gmBusy = false;
       if (VLP.trade) { VLP.trade.pending = false; const g = $('vlpGo'), e = $('vlpErr'); if (g) g.disabled = false; if (e) e.textContent = msg.text; }
       else showToast('VELO$IPE', '⚠️ ' + msg.text, 'logo', '#ff5c5c');
       break;
@@ -10901,7 +11063,12 @@ function vlpHandle(msg) {
         const u = msg.assets[a.id]; if (!u) return;
         Object.assign(a, u); if (a.spark) { a.spark.push(u.rate); if (a.spark.length > 36) a.spark.shift(); }
       });
+      (VLP.gifts || []).forEach(g => {
+        const u = msg.gifts && msg.gifts[g.id]; if (!u) return;
+        Object.assign(g, u); if (g.spark) { g.spark.push(u.rate); if (g.spark.length > 36) g.spark.shift(); }
+      });
       if (!VLP.open) break;
+      if (VLP.tab === 'gifts') vlpRerenderGifts();
       if (VLP.tab === 'market') patchMarket({ pt:{ t:msg.t, r:msg.market.rate } });
       else if (VLP.tab === 'assets' || VLP.tab === 'portfolio') { VLP.enter = false; renderPane({}); }
       renderStarChips(); patchTicker();
@@ -10913,6 +11080,15 @@ function vlpHandle(msg) {
     }
     case 'velosipe_limit':
       vlpApplySharedLimit(msg.bought);
+      break;
+    case 'nft_listings':
+      VLP.listings = msg.listings || [];
+      if (VLP.open && VLP.tab === 'gifts') vlpRerenderGifts();
+      break;
+    case 'gm_done':
+      VLP.gmBusy = false;
+      showToast('Биржа подарков', msg.text, 'logo', msg.kind === 'buy' ? '#34c759' : '#7a3cf0');
+      if (VLP.open) { vxBurst(msg.kind || 'buy'); if (VLP.tab === 'gifts') vlpRerenderGifts(true); }
       break;
     case 'market_news':
       VLP.news.unshift(msg.news); VLP.news.length = Math.min(VLP.news.length, 40); VLP.newsId = msg.news.id;
