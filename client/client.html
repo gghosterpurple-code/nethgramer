@@ -2118,6 +2118,10 @@ html.dark .ep-mode-tab:hover{background:#1a1a1a}
 .vx-spark{display:block;width:96px;height:36px}
 .vx-chg{font-size:12.5px;font-weight:800}
 .vx-gcard{cursor:default}
+.vx-gico{background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.14),rgba(255,255,255,.04))}
+.vx-gico .gift-still{width:86%;height:86%}
+.vx-nft-art .gift-still{width:84%;height:84%;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.vx-still-wait{display:flex;align-items:center;justify-content:center;width:100%;height:100%;opacity:.55}
 .vx-gbtns{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .vx-gbtns i{font-style:normal;opacity:.8}
 .vx-nft{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;padding:12px;border-radius:20px;background:var(--glass);border:1px solid var(--line)}
@@ -10639,6 +10643,7 @@ function renderPane(opts) {
   body.innerHTML = VLP.market ? ({ assets:paneAssets, gifts:paneGifts, portfolio:panePortfolio, history:paneHistory, news:paneNews })[VLP.tab]()
                               : '<div class="vlx-wrap"><div class="vx-skel"></div><div class="vx-skel"></div><div class="vx-skel"></div></div>';
   if (!VLP.enter) body.scrollTop = sc;
+  if (VLP.tab === 'gifts') vxMountStills(body);
   VLP.built = VLP.tab; if (VLP.market) VLP.enter = false;
 }
 
@@ -10746,6 +10751,23 @@ function paneAssets() {
 }
 
 // ── вкладка «Подарки»: курс подарков + NFT-маркет ──
+// Статичные картинки подарков: первый кадр анимации (считается один раз и кешируется)
+const VX_STILL = {};
+function vxStill(model, fallback) {
+  if (VX_STILL[model]) return '<img class="gift-still" src="' + VX_STILL[model] + '" alt="" draggable="false">';
+  return '<span class="vx-still-wait" data-vx-still="' + vEsc(model) + '">' + fallback + '</span>';
+}
+function vxMountStills(root) {
+  (root || document).querySelectorAll('[data-vx-still]').forEach(el => {
+    const model = el.dataset.vxStill;
+    el.removeAttribute('data-vx-still');
+    ensureLottie(() => getGiftFrame(model).then(url => {
+      if (!url) return;
+      VX_STILL[model] = url;
+      if (el.isConnected) el.outerHTML = '<img class="gift-still" src="' + url + '" alt="" draggable="false">';
+    }));
+  });
+}
 function vlpMyGifts() { return (myUser && receivedGifts[myUser.id]) || []; }
 function vlpGiftCount(id) { return vlpMyGifts().filter(g => !g.isNft && g.giftId === id).length; }
 function vlpRerenderGifts(force) {
@@ -10758,7 +10780,7 @@ function giftMarketCard(g, i) {
   const ch = vlpLiveChange({ id:'g_' + g.id, rate:g.rate, periodChange:g.periodChange }), own = vlpGiftCount(g.id);
   const stock = g.stock == null ? 'всегда в наличии' : g.stock > 0 ? 'на бирже ' + vN(g.stock) + ' шт.' : 'на бирже нет';
   return `<div class="vx-asset vx-gcard ${vCls(ch)}${vIn()}"${vSt(i)}>
-    <div class="vx-aico">${GIFT_FALLBACK_EMOJI[g.id] || '🎁'}</div>
+    <div class="vx-aico vx-gico">${vxStill(g.id, GIFT_FALLBACK_EMOJI[g.id] || '🎁')}</div>
     <div class="vx-ainfo"><b>${vEsc(g.name)}</b><small>${stock} · магазин ${vN(g.price)} ⭐</small><div class="vx-aprice">${v2(g.rate)} ${vStar()}</div></div>
     <div class="vx-aright">${vxSpark(g.spark, ch >= 0)}<span class="vx-chg ${vCls(ch)}">${vArrow(ch)} ${vPct(ch)}</span></div>
     <div class="vx-gbtns"><button class="vx-btn buy sm" onclick="gmBuy('${g.id}')" ${g.stock === 0 ? 'disabled' : ''}>Купить · ${vN(g.buy)} ⭐</button>
@@ -10767,7 +10789,7 @@ function giftMarketCard(g, i) {
 function nftLotCard(l, i) {
   const n = l.nft, mine = myUser && l.sellerId === myUser.id;
   return `<div class="vx-nft${vIn()}"${vSt(i)}>
-    <div class="vx-nft-art" style="background:${vEsc(n.nftGradient || 'linear-gradient(135deg,#7a3cf0,#2aabee)')}">${GIFT_FALLBACK_EMOJI[n.giftId] || '✨'}</div>
+    <div class="vx-nft-art" style="background:${vEsc(n.nftGradient || 'linear-gradient(135deg,#7a3cf0,#2aabee)')}">${vxStill(n.nftModel || n.giftId, GIFT_FALLBACK_EMOJI[n.giftId] || '✨')}</div>
     <div class="vx-nft-info"><b>${vEsc(n.giftName)} <span>${vEsc(n.nftTag || '')}</span></b>
       <small>${n.nftModelName ? 'Модель ' + vEsc(n.nftModelName) : ''}${n.nftGradientName ? ' · Фон ' + vEsc(n.nftGradientName) : ''}</small>
       <small>Продавец: ${mine ? 'вы' : vEsc(l.sellerName)}</small>
@@ -10779,7 +10801,7 @@ function myNftRow(g) {
   const key = String(g.ts), val = (VLP.listDraft && VLP.listDraft[key]) || '';
   const worn = typeof wornNft !== 'undefined' && wornNft && String(wornNft.ts) === key;
   return `<div class="vx-nft vx-nft-mine">
-    <div class="vx-nft-art" style="background:${vEsc(g.nftGradient || 'linear-gradient(135deg,#7a3cf0,#2aabee)')}">${GIFT_FALLBACK_EMOJI[g.giftId] || '✨'}</div>
+    <div class="vx-nft-art" style="background:${vEsc(g.nftGradient || 'linear-gradient(135deg,#7a3cf0,#2aabee)')}">${vxStill(g.nftModel || g.giftId, GIFT_FALLBACK_EMOJI[g.giftId] || '✨')}</div>
     <div class="vx-nft-info"><b>${vEsc(g.giftName)} <span>${vEsc(g.nftTag || '')}</span></b><small>${g.nftModelName ? 'Модель ' + vEsc(g.nftModelName) : ''}${g.nftGradientName ? ' · Фон ' + vEsc(g.nftGradientName) : ''}</small>
       ${worn ? '<small>Сейчас носится — снимите, чтобы продать</small>' : `<div class="vx-nft-sell"><input type="number" min="1" inputmode="numeric" placeholder="Цена в ⭐" value="${vEsc(val)}" oninput="(VLP.listDraft=VLP.listDraft||{})['${key}']=this.value">
         <button class="vx-btn sell sm" onclick="nftList('${key}', this.previousElementSibling.value)">Выставить</button></div>`}</div></div>`;
