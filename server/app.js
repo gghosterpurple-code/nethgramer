@@ -66,8 +66,28 @@ const fakeMembers    = new Map();
 const userStars      = new Map();
 const dailyRewards   = new Map();   // userId -> время последней ежедневной награды
 const UNLIMITED_STARS = 999999999;   // баланс-метка режима /unlimited
-const GIFT_SELL_RATE = 0.85;         // продажа подарка: 85% от цены (то же число в client.html)
-const DAILY_REWARD = 500, DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const GIFT_SELL_RATE = 0.6;          // продажа подарка: 60% от цены (то же число в client.html)
+// Лимит покупок: не больше GIFT_DAY_LIMIT подарков одного вида в сутки на человека (магазин + биржа)
+const GIFT_DAY_LIMIT = 12;
+const giftBuysToday  = new Map();   // userId -> {day, n:{giftId:count}}
+function giftBoughtToday(uid, giftId) {
+  const r = giftBuysToday.get(uid);
+  return r && r.day === dayKeyNow() ? (r.n[giftId] || 0) : 0;
+}
+/** Проверить лимит. Возвращает текст ошибки или null. Админы бота лимита не имеют. */
+function giftLimitError(uid, def) {
+  if (nethgramAdminUsers.has(uid)) return null;
+  const used = giftBoughtToday(uid, def.id);
+  return used >= GIFT_DAY_LIMIT ? `Лимит: не больше ${GIFT_DAY_LIMIT} «${def.name}» в день. Попробуйте завтра` : null;
+}
+function countGiftBuy(uid, giftId) {
+  const day = dayKeyNow();
+  let r = giftBuysToday.get(uid);
+  if (!r || r.day !== day) { r = { day, n:{} }; giftBuysToday.set(uid, r); }
+  r.n[giftId] = (r.n[giftId] || 0) + 1;
+}
+function dayKeyNow() { const d = new Date(); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }
+const DAILY_REWARD = 100, DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const premiumUsernames = new Map();
 const premiumUsers = new Set(); // у кого есть Nethgram Premium (выдаёт администратор: /premium @юзернейм)
 const PROFILE_BG_IDS = new Set(['aurora','sunset','ocean','forest','candy','midnight','lava','mint','gold','rose','cosmic','carbon']);
@@ -96,6 +116,10 @@ const GIFT_DEFS = [
   { id:'zombie',      name:'Zombie',      price:9999999, stock:100, limited:true  },
   { id:'facepalm',    name:'Facepalm',    price:3000,    stock:5,   limited:true  },
   { id:'medal',       name:'Medal',       price:7777,    stock:66,  limited:true  },
+  { id:'peach',       name:'Peach',       price:5000,    stock:35,  limited:true  },
+  { id:'rolex_watch', name:'Watch',       price:2500,    stock:40,  limited:true  },
+  { id:'signet_ring', name:'Signet Ring', price:10000,   stock:10,  limited:true  },
+  { id:'cigarette',   name:'Cigarette',   price:1500,    stock:25,  limited:true  },
   { id:'test_gift_1', name:'Test Gift 1', price:10,    stock:5,     limited:true,  adminOnly:true },
   { id:'test_gift_2', name:'Test Gift 2', price:15,    stock:10,    limited:true,  adminOnly:true },
   { id:'test_nft',    name:'Test NFT',    price:1500,  stock:50,    limited:true,  adminOnly:true },
@@ -247,11 +271,29 @@ const assetDef = id => ASSET_DEFS.find(a => a.id === id);
 // Подарок можно продать бирже по курсу или купить у биржи. Лимитированные подарки биржа продаёт
 // только из того, что ей продали игроки (новые не создаются), безлимитные — всегда.
 // NFT торгуются между игроками: выставил за свою цену → другой купил.
-const GM_SPREAD = 0.03;            // разница цены покупки и продажи (±3%)
-const GM_IMPACT = 0.01;            // каждая сделка двигает курс на 1%
+const GM_SPREAD = 0.08;            // разница цены покупки и продажи (±8%): перепродать сразу — потерять ~15%
+const GM_IMPACT = 0.01;
+const TRADE_FEE = 0.05;            // комиссия биржи за вход в актив и за выход из него (5% + 5%)
+const VLP_FEE   = 0.03;            // комиссия за покупку и продажу $VLP (3% + 3%)
+const LEVERAGES = [1, 2, 5, 10];   // кредитное плечо для вложений в звёздах
+const LIQ_LEVEL = 0.1;             // ликвидация, когда от вложенного осталось 10%            // каждая сделка двигает курс на 1%
 const giftMarket  = new Map();     // giftId -> {rate, prevRate, series, stock, ev, trend}
 const nftListings = [];            // [{id, sellerId, sellerName, price, ts, nft}]
 const GIFT_DEFS_TRADABLE = () => GIFT_DEFS.filter(d => !d.adminOnly);
+/** Можно ли сейчас купить подарок в магазине по фиксированной цене */
+function shopSells(def) {
+  if (globalSoldOut || def.adminOnly) return false;
+  if (!def.limited) return true;
+  return (giftStock.get(def.id) || 0) > 0;
+}
+/**
+ * Цена, по которой биржа выкупает подарок. Пока подарок продаётся в магазине, биржа не платит больше,
+ * чем дал бы магазин при продаже (GIFT_SELL_RATE от цены). Иначе «купил в магазине → продал бирже дороже» — дюп.
+ */
+function gmBid(def, g) {
+  const bid = gmSellPrice(g);
+  return shopSells(def) ? Math.min(bid, Math.floor(def.price * GIFT_SELL_RATE)) : bid;
+}
 function giftBounds(def) { return [Math.max(1, def.price / 10), def.price * 50]; }
 function ensureGiftMarket() {
   for (const d of GIFT_DEFS_TRADABLE()) if (!giftMarket.has(d.id)) giftMarket.set(d.id, { rate:d.price, prevRate:d.price, series:newSeries(d.price), stock:0 });
@@ -317,10 +359,12 @@ const MKT = {
   trendChance: 0.03,   // смена тренда (в среднем раз в ~8 мин)
   trendMax: 0.004,     // сила тренда до ±0.4% за тик
   revert: 0.0015,      // притяжение к базе (слабое — чтобы курс мог надолго уходить далеко)
-  spikeChance: 0.006,  // одиночная свеча ±6–25% (примерно раз в 40 мин)
-  pumpChance: 0.0018,  // начало пампа (примерно раз в 2,3 ч на рынок)
-  crashChance: 0.0016, // начало обвала
-  afterPumpDump: 0.6,  // после пампа в 60% случаев приходит слив
+  spikeChance: 0.008,  // одиночная свеча ±6–25% (примерно раз в 30 мин), вниз чаще, чем вверх
+  spikeDownBias: 0.62, // доля свечей вниз
+  pumpChance: 0.0016,  // начало пампа (примерно раз в 2,6 ч на рынок)
+  crashChance: 0.0026, // начало обвала (чаще пампов)
+  afterPumpDump: 0.85, // после пампа в 85% случаев приходит слив
+  drift: -0.0004,      // курс в спокойное время медленно сползает вниз (держится ниже базы)
 };
 function rnd(a, b) { return a + Math.random() * (b - a); }
 function pumpTarget() { // во сколько раз вырастет: чаще ×1.5–3, иногда ×3–10, редко ×10–40
@@ -357,14 +401,14 @@ function stepRate(m, base, min, max, scale) {
     startEvent(m, 'pump', pumpTarget(), Math.floor(rnd(8, 48)));   // 2–12 минут роста
     started = 'pump'; nr = rate;
   } else if (Math.random() < MKT.crashChance * scale) {
-    startEvent(m, 'crash', rnd(0.2, 0.7), Math.floor(rnd(3, 16)));  // −30…−80% за 1–4 минуты
+    startEvent(m, 'crash', rnd(0.15, 0.65), Math.floor(rnd(2, 12)));  // −35…−85% за 0,5–3 минуты
     started = 'crash'; nr = rate;
   } else if (Math.random() < MKT.spikeChance * scale) {
-    nr = rate * (1 + (Math.random() < 0.5 ? -1 : 1) * rnd(0.06, 0.25));
+    nr = rate * (1 + (Math.random() < MKT.spikeDownBias ? -1 : 1) * rnd(0.06, 0.25));
   } else {
     if (Math.random() < MKT.trendChance || typeof m.trend !== 'number') m.trend = (Math.random() * 2 - 1) * MKT.trendMax;
     const noise = (Math.random() + Math.random() + Math.random() - 1.5) * MKT.noise * 1.4;
-    nr = rate * Math.exp(m.trend + noise - Math.log(rate / base) * MKT.revert);
+    nr = rate * Math.exp(m.trend + MKT.drift + noise - Math.log(rate / base) * MKT.revert);
   }
   if (nr >= max || nr <= min) { if (m.ev) m.ev = null; m.trend = 0; }
   m.rate = r2(Math.min(max, Math.max(min, nr)));
@@ -425,6 +469,7 @@ function tickMarket() {
       eventNews('🎁 ' + def.name, 'gift_' + def.id, s, g.prevRate);
     }
     broadcastAll(null, { type:'velosipe_tick', t:now, market:marketLive(), assets:assetsLive(), gifts:giftsLive() });
+    checkLiquidations();
   } catch (e) { console.error('tickMarket error:', e.message); }
 }
 function randomNewsEvent() {
@@ -435,6 +480,7 @@ function randomNewsEvent() {
     const dir = t.dir || (Math.random() < 0.5 ? -1 : 1);
     const change = shock(t.target, dir * (t.min + Math.random() * (t.max - t.min)) * 1.6);
     addNews(t.title, t.text, t.target, change);
+    checkLiquidations();
   } catch (e) { console.error('randomNewsEvent error:', e.message); }
 }
 
@@ -450,6 +496,7 @@ function assetsLive() {
 function marketFull(period) {
   const pts = seriesPoints(velosipe.series, period);
   return { ...marketLive(), totalSupply:VLP_TOTAL_SUPPLY, dailyLimit:VLP_DAILY_LIMIT, minRate:VLP_MIN_RATE, maxRate:VLP_MAX_RATE,
+           fees:{ trade:TRADE_FEE, vlp:VLP_FEE, liq:LIQ_LEVEL, levs:LEVERAGES },
            resetsAt:nextMidnight(), periodChange:periodChangeOf(pts), history:decimate(pts, 240) };
 }
 function assetsFull(period) {
@@ -464,7 +511,7 @@ function giftsLive() {
   const o = {};
   for (const def of GIFT_DEFS_TRADABLE()) {
     const g = giftMarket.get(def.id); if (!g) continue;
-    o[def.id] = { rate:g.rate, prevRate:g.prevRate, change:pct(g.prevRate, g.rate), buy:gmBuyPrice(g), sell:gmSellPrice(g), stock: def.limited ? (g.stock || 0) : null };
+    o[def.id] = { rate:g.rate, prevRate:g.prevRate, change:pct(g.prevRate, g.rate), buy:gmBuyPrice(g), sell:gmBid(def, g), capped:shopSells(def), stock: def.limited ? (g.stock || 0) : null };
   }
   return o;
 }
@@ -481,11 +528,32 @@ function listingsView() {
     nft:{ giftId:l.nft.giftId, giftName:l.nft.giftName, nftTag:l.nft.nftTag, nftNumber:l.nft.nftNumber, nftModel:l.nft.nftModel,
           nftModelName:l.nft.nftModelName, nftGradient:l.nft.nftGradient, nftGradientName:l.nft.nftGradientName } }));
 }
+const posLev   = p => p.lev || 1;
+const posValue = (p, rate) => Math.max(0, Math.floor(p.units * rate - (p.debt || 0)));
+const posLiqRate = p => posLev(p) > 1 && p.units > 0 ? ((p.debt || 0) + p.cost * LIQ_LEVEL) / p.units : 0;
 function positionView(p) {
   const a = assetsMarket.get(p.assetId), def = assetDef(p.assetId);
-  const value = Math.floor(p.units * a.rate), pnl = value - p.cost;
-  return { assetId:p.assetId, name:def.name, icon:def.icon, currency:p.currency, cost:p.cost, units:p.units, value, rate:a.rate,
-           pnl, pnlPct: p.cost ? r2((pnl / p.cost) * 100) : 0 };
+  const value = posValue(p, a.rate), pnl = value - p.cost;
+  return { assetId:p.assetId, name:def.name, icon:def.icon, currency:p.currency, cost:p.cost, units:p.units, debt:p.debt || 0, lev:posLev(p),
+           liqRate:r2(posLiqRate(p)), value, rate:a.rate, pnl, pnlPct: p.cost ? r2((pnl / p.cost) * 100) : 0 };
+}
+/** Ликвидация позиций с плечом: курс ушёл против — позиция сгорает целиком */
+function checkLiquidations() {
+  for (const [uid, list] of userPositions) {
+    let hit = null;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i]; if (posLev(p) <= 1) continue;
+      const a = assetsMarket.get(p.assetId), def = assetDef(p.assetId); if (!a || !def) continue;
+      if (posValue(p, a.rate) > p.cost * LIQ_LEVEL) continue;
+      list.splice(i, 1);
+      addTrade(uid, { type:'liq', assetId:def.id, assetName:def.name, icon:def.icon, currency:p.currency, lev:posLev(p), amount:p.cost, pnl:-p.cost });
+      (hit = hit || []).push(def.icon + ' ' + def.name + ' ×' + posLev(p) + ' (−' + p.cost.toLocaleString('ru-RU') + ' ⭐)');
+    }
+    if (!hit) continue;
+    scheduleSave();
+    const u = users.get(uid);
+    if (u && isSocketOpen(u.ws)) safeSend(u.ws, { type:'velosipe_liq', text:'💀 Ликвидация: ' + hit.join(', ') + '. Вложенное сгорело.' });
+  }
 }
 function meView(uid) {
   const rec = getUserVlp(uid), pos = positionsOf(uid);
@@ -583,6 +651,8 @@ function saveNow() {
       channelGifts: channelGiftsObj,
       giveaways: giveawaysObj,
       dailyRewards: Object.fromEntries(dailyRewards),
+      giftBuysToday: Object.fromEntries(giftBuysToday),
+      giftRestock,
       globalSoldOut,
       velosipe: serializeVelosipe(),
       premiumUsers: [...premiumUsers],
@@ -597,6 +667,68 @@ function saveNow() {
 }
 
 /** Остаток не может быть больше, чем тираж минус реально выданные подарки (чинит прошлые сбросы) */
+// ── Возвращение распроданных подарков: раз в месяц на 2 часа, по RESTOCK_AMOUNT штук ──
+const RESTOCK_AMOUNT = 30, RESTOCK_MS = 2 * 3600e3;
+const giftRestock = { nextAt:0, active:null, extra:{} }; // active: {until, ids:[]}; extra: сколько довыпущено сверх тиража
+function planNextRestock(afterTs) {
+  // случайный день месяца, между 12:00 и 22:00 по времени сервера
+  const base = new Date(afterTs);
+  for (let off = 0; off < 3; off++) {
+    const d = new Date(base.getFullYear(), base.getMonth() + off, 1 + Math.floor(Math.random() * 28), 12 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 60));
+    // не раньше чем через 20 дней после прошлого возвращения — чтобы было ровно «раз в месяц»
+    if (d.getTime() > afterTs + (giftRestock.lastAt ? 20 * 86400e3 : 0) && d.getTime() > Date.now()) { giftRestock.nextAt = d.getTime(); return; }
+  }
+  giftRestock.nextAt = afterTs + 30 * 86400e3;
+}
+function restockView() {
+  const a = giftRestock.active;
+  return a && a.until > Date.now() ? { until:a.until, ids:a.ids } : null;
+}
+function countUsedGifts() {
+  const used = new Map();
+  const count = g => {
+    if (!g || !g.giftId) return;
+    const n = (g.fromId === 'bot_nethgram' ? 0 : 1) + (g.isNft ? 1 : 0);
+    used.set(g.giftId, (used.get(g.giftId) || 0) + n);
+  };
+  for (const list of userGifts.values()) list.forEach(count);
+  for (const list of channelGifts.values()) list.forEach(count);
+  return used;
+}
+function startGiftRestock() {
+  const used = countUsedGifts(), ids = [];
+  for (const def of GIFT_DEFS) {
+    if (!def.limited || def.adminOnly || (giftStock.get(def.id) || 0) > 0) continue;
+    // довыпуск: ровно RESTOCK_AMOUNT штук сверх того, что уже выдано
+    giftRestock.extra[def.id] = Math.max(giftRestock.extra[def.id] || 0, (used.get(def.id) || 0) + RESTOCK_AMOUNT - def.stock);
+    giftStock.set(def.id, RESTOCK_AMOUNT);
+    ids.push(def.id);
+  }
+  giftRestock.lastAt = Date.now();
+  planNextRestock(Date.now());
+  if (!ids.length) { scheduleSave(); return; }
+  giftRestock.active = { until: Date.now() + RESTOCK_MS, ids };
+  scheduleSave();
+  const names = ids.map(id => GIFT_NAMES[id]).join(', ');
+  console.log('🎁 Возвращение подарков на 2 часа:', names);
+  broadcastAll(null, { type:'gift_restock', restock:restockView(), stocks:Object.fromEntries(ids.map(id => [id, RESTOCK_AMOUNT])), amount:RESTOCK_AMOUNT, names });
+}
+function endGiftRestock() {
+  const a = giftRestock.active; giftRestock.active = null;
+  if (!a) return;
+  const stocks = {};
+  for (const id of a.ids) { giftStock.set(id, 0); stocks[id] = 0; } // что не раскупили — сгорает
+  scheduleSave();
+  broadcastAll(null, { type:'gift_restock', restock:null, stocks });
+}
+function checkGiftRestock() {
+  try {
+    const now = Date.now();
+    if (giftRestock.active && now >= giftRestock.active.until) endGiftRestock();
+    if (!giftRestock.nextAt) { planNextRestock(now); scheduleSave(); }
+    if (!giftRestock.active && now >= giftRestock.nextAt) startGiftRestock();
+  } catch (e) { console.error('restock error:', e.message); }
+}
 function restoreGiftStock() {
   const used = new Map();
   const count = g => {
@@ -609,7 +741,7 @@ function restoreGiftStock() {
   for (const list of channelGifts.values()) list.forEach(count);
   for (const def of GIFT_DEFS) {
     if (!def.limited) continue;
-    const real = Math.max(0, def.stock - (used.get(def.id) || 0));
+    const real = Math.max(0, def.stock + (giftRestock.extra[def.id] || 0) - (used.get(def.id) || 0));
     const cur = giftStock.get(def.id);
     if (cur === null || cur === undefined || cur > real) giftStock.set(def.id, real);
   }
@@ -641,6 +773,7 @@ function loadState() {
     for (const [cid, bots] of Object.entries(data.fakeMembers||{})) fakeMembers.set(cid, bots);
     for (const [uid, bal] of Object.entries(data.userStars||{})) userStars.set(uid, Number(bal));
     for (const [uid, ts] of Object.entries(data.dailyRewards||{})) dailyRewards.set(uid, Number(ts));
+    for (const [uid, r] of Object.entries(data.giftBuysToday||{})) if (r && r.n) giftBuysToday.set(uid, r);
     for (const [uid, uns] of Object.entries(data.premiumUsernames||{})) premiumUsernames.set(uid, uns);
     for (const [gid, gw] of Object.entries(data.giveaways||{})) {
       giveaways.set(gid, { ...gw, participants: new Set(gw.participants||[]) });
@@ -649,6 +782,7 @@ function loadState() {
     if (data.globalSoldOut !== undefined) globalSoldOut = !!data.globalSoldOut;
     loadVelosipe(data.velosipe);
     for (const id of (data.premiumUsers||[])) premiumUsers.add(id);
+    if (data.giftRestock) Object.assign(giftRestock, { extra:{}, ...data.giftRestock });
     restoreGiftStock();
     console.log('State loaded:', users.size, 'users,', channels.size, 'channels');
   } catch(e) { console.error('Load error:', e.message); }
@@ -910,6 +1044,8 @@ function ensureNewsChannel() {
 
 setInterval(saveNow, 30000);
 setInterval(tickMarket, VLP_TICK_MS);
+setInterval(checkGiftRestock, 60e3);
+setTimeout(checkGiftRestock, 5e3);
 setInterval(randomNewsEvent, VLP_NEWS_MS);
 let shuttingDown = false;
 async function shutdown() {
@@ -1155,6 +1291,25 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     if (!tu) { for (const u of users.values()) { if ((u.name || '').toLowerCase() === target.toLowerCase()) { tu = u; break; } } }
     if (!tu) return { text: '❌ Пользователь "' + target + '" не найден.' };
     return { text: '⭐ Отправлено ' + amt.toLocaleString('ru-RU') + ' звёзд пользователю ' + (tu.name || tu.id) + (tu.username ? ' (@' + tu.username + ')' : '') + '.', giveStars: { toId: tu.id, amount: amt } };
+  }
+
+  // /sr — скрытая команда: обнулить звёзды у всех пользователей (нужно подтверждение)
+  if (t === '/sr' || t.startsWith('/sr ')) {
+    if (!isAdmin) return { text: '🔒 Команда доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
+    if (t.substring(3).trim().toLowerCase() !== 'да') {
+      let withStars = 0; for (const b of userStars.values()) if (b > 0) withStars++;
+      return { text: '⚠️ Это обнулит звёзды у ВСЕХ пользователей (' + withStars + ' с ненулевым балансом), включая бесконечные. Отменить нельзя.\n\nДля подтверждения отправьте: /sr да' };
+    }
+    let n = 0;
+    for (const [uid, b] of userStars) {
+      if (b === 0) continue;
+      userStars.set(uid, 0); n++;
+      const u = users.get(uid);
+      if (u && isSocketOpen(u.ws)) safeSend(u.ws, starsSyncMsg(uid));
+    }
+    scheduleSave();
+    console.log('⭐ /sr: звёзды обнулены у ' + n + ' пользователей');
+    return { text: '✅ Готово: звёзды обнулены у ' + n + ' пользователей.' };
   }
 
   // /sets [кол-во] — установить свой баланс точно на это число
@@ -1951,7 +2106,7 @@ server.on('upgrade', (req, socket) => {
         // Gift stock
         const stockObj = {};
         for (const [id, stock] of giftStock) stockObj[id] = stock;
-        send({ type:'my_chats', channels: myChannels, users: allUsers, giftStock: stockObj });
+        send({ type:'my_chats', channels: myChannels, users: allUsers, giftStock: stockObj, giftRestock: restockView() });
 
         // Legacy-compatible payload with channel messages
         const channelsWithMessages = myChannels.map(ch => ({
@@ -2501,7 +2656,10 @@ server.on('upgrade', (req, socket) => {
           if (globalSoldOut && !isBotAdmin) { giftFail('Магазин временно закрыт'); break; }
           const gStock = giftStock.get(gDef.id);
           if (gStock !== null && gStock !== undefined && gStock <= 0) { giftFail('Подарок распродан!'); break; }
+          const gLim = giftLimitError(userId, gDef);
+          if (gLim) { giftFail(gLim); break; }
           if (!trySpendStars(userId, gDef.price)) { giftFail('Недостаточно звёзд'); break; }
+          countGiftBuy(userId, gDef.id);
           gReq.giftName = gDef.name;
           gReq.giftPrice = gDef.price;
           gReq.fromName = senderUser?.name || 'Пользователь';
@@ -2867,7 +3025,9 @@ server.on('upgrade', (req, socket) => {
         if (sg.isNft) { sellFail('NFT нельзя продать'); break; }
         const def = GIFT_DEFS.find(d => d.id === sg.giftId);
         const basePrice = def ? def.price : (sg.giftPrice || 0);
-        const amount = Math.floor(basePrice * GIFT_SELL_RATE);
+        let amount = Math.floor(basePrice * GIFT_SELL_RATE);
+        const sgm = def && !def.adminOnly && giftMarket.get(def.id);
+        if (sgm) amount = Math.min(amount, gmBid(def, sgm));
         if (amount <= 0) { sellFail('Этот подарок нельзя продать'); break; }
         own.splice(si, 1);
         const bal = starsOf(userId);
@@ -3112,7 +3272,7 @@ server.on('upgrade', (req, socket) => {
       case 'get_gift_stock': {
         const stockObj = {};
         for (const [id, stock] of giftStock) stockObj[id] = stock;
-        send({ type:'my_chats', channels:[], users:[], giftStock: stockObj });
+        send({ type:'my_chats', channels:[], users:[], giftStock: stockObj, giftRestock: restockView() });
         break;
       }
 
@@ -3131,7 +3291,10 @@ server.on('upgrade', (req, socket) => {
         if (globalSoldOut && !isBotAdmin) { chFail('Магазин временно закрыт'); break; }
         const curStock = giftStock.get(giftId);
         if (curStock !== null && curStock !== undefined && curStock <= 0) { chFail('Подарок распродан!'); break; }
+        const chLim = giftLimitError(userId, giftDef);
+        if (chLim) { chFail(chLim); break; }
         if (!trySpendStars(userId, giftDef.price)) { chFail('Недостаточно звёзд'); break; }
+        countGiftBuy(userId, giftId);
         if (curStock !== null && curStock !== undefined) {
           giftStock.set(giftId, curStock - 1);
           send({ type:'stock_update', giftId, stock: curStock - 1 });
@@ -3196,7 +3359,7 @@ server.on('upgrade', (req, socket) => {
         const idx = own.findIndex(x => !x.isNft && x.giftId === def.id && (msg.giftTs == null || String(x.ts) === String(msg.giftTs)));
         if (idx === -1) { send({ type:'velosipe_error', text:'У вас нет подарка «' + def.name + '»' }); break; }
         const sold = own.splice(idx, 1)[0];
-        const amount = gmSellPrice(g);
+        const amount = gmBid(def, g);
         addStarsTo(userId, amount);
         g.stock = (g.stock || 0) + 1;
         const [mn, mx] = giftBounds(def);
@@ -3214,8 +3377,11 @@ server.on('upgrade', (req, socket) => {
         const def = GIFT_DEFS_TRADABLE().find(d => d.id === msg.giftId), g = def && giftMarket.get(def.id);
         if (!g) { send({ type:'velosipe_error', text:'Этот подарок не торгуется на бирже' }); break; }
         if (def.limited && (g.stock || 0) <= 0) { send({ type:'velosipe_error', text:'На бирже нет «' + def.name + '». Ждите, пока кто-то продаст' }); break; }
+        const gmLim = giftLimitError(userId, def);
+        if (gmLim) { send({ type:'velosipe_error', text:gmLim }); break; }
         const price = gmBuyPrice(g);
         if (!trySpendStars(userId, price)) { send({ type:'velosipe_error', text:'Недостаточно звёзд: нужно ' + price.toLocaleString('ru-RU') + ' ⭐' }); break; }
+        countGiftBuy(userId, def.id);
         if (def.limited) g.stock--;
         const [mn, mx] = giftBounds(def);
         g.rate = r2(Math.max(mn, Math.min(mx, g.rate * (1 + GM_IMPACT))));
@@ -3299,7 +3465,7 @@ server.on('upgrade', (req, socket) => {
         if (want > left) { send({ type:'velosipe_error', text:`Общий дневной лимит — ${VLP_DAILY_LIMIT.toLocaleString('ru-RU')} $VLP. Сегодня осталось ${left.toLocaleString('ru-RU')} $VLP` }); break; }
         if (velosipe.available <= 0) { send({ type:'velosipe_error', text:'В резерве не осталось монет' }); break; }
         const n = Math.min(want, velosipe.available);
-        const cost = Math.ceil(n * velosipe.rate - 1e-9);
+        const cost = Math.ceil(n * velosipe.rate * (1 + VLP_FEE) - 1e-9);
         const stars = userStars.get(userId) || 0;
         if (stars < cost) { send({ type:'velosipe_error', text:`Недостаточно звёзд: нужно ${cost.toLocaleString('ru-RU')} ⭐` }); break; }
         trySpendStars(userId, cost);
@@ -3319,7 +3485,7 @@ server.on('upgrade', (req, socket) => {
         const n = toInt(msg.amount), rec = getUserVlp(userId);
         if (!n) { send({ type:'velosipe_error', text:'Введите количество $VLP' }); break; }
         if (n > rec.balance) { send({ type:'velosipe_error', text:'У вас нет столько $VLP' }); break; }
-        const payout = Math.floor(n * velosipe.rate);
+        const payout = Math.floor(n * velosipe.rate * (1 - VLP_FEE));
         rec.basis = rec.balance > 0 ? rec.basis * (1 - n / rec.balance) : 0;
         rec.balance -= n;
         velosipe.available = Math.min(VLP_TOTAL_SUPPLY, velosipe.available + n);
@@ -3339,6 +3505,7 @@ server.on('upgrade', (req, socket) => {
         const amount = toInt(msg.amount);
         if (!amount) { send({ type:'velosipe_error', text:'Введите сумму' }); break; }
         const a = assetsMarket.get(def.id);
+        const lev = currency === 'stars' && LEVERAGES.includes(Number(msg.lev)) ? Number(msg.lev) : 1;
         let basisShare = 0;
         if (currency === 'stars') {
           const stars = userStars.get(userId) || 0;
@@ -3351,10 +3518,12 @@ server.on('upgrade', (req, socket) => {
           rec.basis -= basisShare; rec.balance -= amount;
         }
         const list = positionsOf(userId);
-        let pos = list.find(p => p.assetId === def.id && p.currency === currency);
-        if (!pos) { pos = { assetId:def.id, currency, units:0, cost:0, basis:0, ts:Date.now() }; list.push(pos); }
-        pos.units += amount / a.rate; pos.cost += amount; pos.basis += basisShare;
-        addTrade(userId, { type:'invest', assetId:def.id, assetName:def.name, icon:def.icon, currency, amount });
+        let pos = list.find(p => p.assetId === def.id && p.currency === currency && posLev(p) === lev);
+        if (!pos) { pos = { assetId:def.id, currency, lev, units:0, cost:0, debt:0, basis:0, ts:Date.now() }; list.push(pos); }
+        const net = amount * (1 - TRADE_FEE);           // комиссия сгорает сразу
+        pos.units += net * lev / a.rate; pos.debt = (pos.debt || 0) + net * (lev - 1);
+        pos.cost += amount; pos.basis += basisShare;
+        addTrade(userId, { type:'invest', assetId:def.id, assetName:def.name, icon:def.icon, currency, amount, lev });
         scheduleSave();
         send({ ...velosipeSnapshot(userId, msg.period), type:'velosipe_trade_ok', kind:'invest' });
         break;
@@ -3365,16 +3534,18 @@ server.on('upgrade', (req, socket) => {
         const def = assetDef(msg.assetId);
         const currency = msg.currency === 'vlp' ? 'vlp' : 'stars';
         const list = positionsOf(userId);
-        const idx = list.findIndex(p => p.assetId === msg.assetId && p.currency === currency);
+        const wantLev = LEVERAGES.includes(Number(msg.lev)) ? Number(msg.lev) : 1;
+        const idx = list.findIndex(p => p.assetId === msg.assetId && p.currency === currency && posLev(p) === wantLev);
         if (!def || idx < 0) { send({ type:'velosipe_error', text:'Позиция не найдена' }); break; }
-        const pos = list[idx], rate = assetsMarket.get(def.id).rate, value = pos.units * rate;
+        const pos = list[idx], rate = assetsMarket.get(def.id).rate, value = posValue(pos, rate);
         let f = msg.all ? 1 : Math.min(1, toInt(msg.amount) / Math.max(value, 1e-9));
         if (!(f > 0)) { send({ type:'velosipe_error', text:'Введите сумму' }); break; }
         if (f > 0.9999) f = 1;
         const unitsPart = f === 1 ? pos.units : pos.units * f;
         const costPart  = f === 1 ? pos.cost  : Math.min(pos.cost, Math.round(pos.cost * f));
         const basisPart = f === 1 ? pos.basis : pos.basis * f;
-        let payout = Math.floor(unitsPart * rate);
+        const debtPart  = f === 1 ? (pos.debt || 0) : (pos.debt || 0) * f;
+        let payout = Math.max(0, Math.floor((unitsPart * rate - debtPart) * (1 - TRADE_FEE)));
         if (payout <= 0 && f < 1) { send({ type:'velosipe_error', text:'Слишком маленькая сумма' }); break; }
         if (currency === 'stars') {
           userStars.set(userId, (userStars.get(userId) || 0) + payout);
@@ -3386,8 +3557,8 @@ server.on('upgrade', (req, socket) => {
           const rec = getUserVlp(userId); rec.balance += payout; rec.basis += basisPart;
         }
         if (f === 1) list.splice(idx, 1);
-        else { pos.units -= unitsPart; pos.cost -= costPart; pos.basis -= basisPart; }
-        addTrade(userId, { type:'divest', assetId:def.id, assetName:def.name, icon:def.icon, currency, amount:payout, pnl:payout - costPart });
+        else { pos.units -= unitsPart; pos.cost -= costPart; pos.basis -= basisPart; pos.debt = (pos.debt || 0) - debtPart; }
+        addTrade(userId, { type:'divest', assetId:def.id, assetName:def.name, icon:def.icon, currency, amount:payout, pnl:payout - costPart, lev:posLev(pos) });
         scheduleSave();
         send({ ...velosipeSnapshot(userId, msg.period), type:'velosipe_trade_ok', kind:'divest' });
         break;

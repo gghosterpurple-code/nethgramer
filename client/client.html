@@ -852,6 +852,7 @@ html.dark .menu-theme-toggle{background:#3390ec}html.dark .menu-theme-toggle:aft
 .gift-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
 .gift-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(42,171,238,.2); }
 .gift-card.sold-out { opacity: .55; cursor: not-allowed; }
+.gift-restock-badge { position:absolute; top:6px; left:6px; z-index:2; font-size:10px; font-weight:800; color:#fff; padding:2px 7px; border-radius:9px; background:linear-gradient(135deg,#ff8a00,#e5287a); box-shadow:0 2px 8px rgba(229,40,122,.4); }
 .gift-card.sold-out:hover { transform: none; }
 
 .gift-card-lottie {
@@ -2182,6 +2183,49 @@ html.dark .ep-mode-tab:hover{background:#1a1a1a}
 .vlp-btn.sell{background:linear-gradient(135deg,#ff6a86,#e22f55);box-shadow:0 8px 24px rgba(255,85,119,.3)}
 .vlp-btn.ghost{background:rgba(255,255,255,.09)}
 .vlp-star{width:1em;height:1em;object-fit:contain;vertical-align:-.12em}
+.vlp-lev{margin-top:-4px}.vlp-lev button.on{background:linear-gradient(135deg,#ff6a86,#e22f55)}
+.vlp-warn{font-size:12px;line-height:1.4;color:#ffb3c0;background:rgba(255,85,119,.12);border:1px solid rgba(255,85,119,.3);border-radius:12px;padding:8px 10px;margin:-4px 0 12px;text-align:center}
+.vlp-sum{flex-wrap:wrap;line-height:1.45}.vlp-sum small{color:#8d89a8}
+.vx-lev{display:inline-block;font-size:11px;font-weight:800;color:#fff;background:linear-gradient(135deg,#ff6a86,#e22f55);padding:1px 7px;border-radius:9px;vertical-align:1px}
+/* ── биржа на телефонах: без тяжёлых размытий и бесконечных анимаций ── */
+.vx-assets{grid-template-columns:repeat(auto-fill,minmax(min(290px,100%),1fr))}
+.vlx-scroll{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+@media (max-width:700px),(hover:none){
+  .vlx-bg i{filter:none;animation:none;opacity:.22;background:radial-gradient(circle,currentColor 0,transparent 68%)!important}
+  .vlx-bg .b1{color:#5b2ad6}.vlx-bg .b2{color:#0e8fd8}.vlx-bg .b3{color:#d1307f}
+  .vx-card,.vx-asset,.vx-news,.vlx-tab,.vlx-chip,.vlx-back,.vlp-trade{backdrop-filter:none;-webkit-backdrop-filter:none}
+  .vx-card,.vx-asset,.vx-news,.vx-pos,.vx-nft{background:rgba(24,20,46,.92);box-shadow:none}
+  .vlx-tab,.vlx-chip,.vlx-back{background:rgba(30,26,56,.95)}
+  .vx-glow{display:none}
+  .vx-invest::after{display:none}
+  .vx-coin{animation:none}
+  .vx-asset:hover,.vx-invest:hover,.vx-btn:hover{transform:none;box-shadow:none}
+  .vx-in{animation-duration:.3s;animation-delay:calc(min(var(--i,0),6)*35ms)}
+  .vx-btn,.vlp-btn,.vx-seg button,.vlp-seg button,.vlx-tab,.vx-pill{touch-action:manipulation}
+}
+@media (max-width:700px){
+  .vlx-scroll{padding:6px 12px calc(110px + env(safe-area-inset-bottom))}
+  .vlx-tabs{padding:10px 12px 6px;gap:6px}
+  .vlx-tab{padding:9px 13px}
+  .vx-card{padding:14px;border-radius:20px}
+  .vx-tool{gap:8px}
+  .vx-tool .vx-seg{overflow-x:auto;max-width:100%;scrollbar-width:none}
+  .vx-tool .vx-seg::-webkit-scrollbar{display:none}
+  .vx-seg button{padding:8px 11px;flex-shrink:0}
+  .vx-asset{padding:12px;gap:10px}
+  .vx-spark{width:72px;height:30px}
+  .vx-gbtns .vx-btn{padding:11px 6px;font-size:12px}
+  .vx-nft{grid-template-columns:56px 1fr;}
+  .vx-nft>.vx-btn{grid-column:1/-1}
+  .vx-nft-art{width:56px;height:56px}
+  .vx-nft-sell input{font-size:16px}
+  .vx-pos .row{flex-wrap:wrap;gap:6px 12px}
+  .vx-news{padding:13px;gap:11px}
+  .vx-news .ico{font-size:24px}
+  .vlx-tickTrack{animation-duration:80s}
+  .vlp-quick button{padding:10px 0}
+}
+@media (max-width:380px){.vx-chips{gap:6px}.vx-chip{padding:8px 9px}.vx-price{font-size:30px}.vx-wallet-big{font-size:26px}}
 /* эффект после сделки */
 .vx-fx{position:fixed;inset:0;z-index:900;pointer-events:none;overflow:hidden}
 .vx-fx span{position:absolute;left:50%;bottom:18%;font-size:26px;animation:vxBurst 1.3s cubic-bezier(.15,.7,.3,1) forwards}
@@ -3944,6 +3988,7 @@ function handleWS(msg) {
       });
 
       // Sync gift stock if provided
+      if ('giftRestock' in msg) GIFT_RESTOCK = msg.giftRestock || null;
       if (msg.giftStock) {
         for (const [id, stock] of Object.entries(msg.giftStock)) giftStock[id] = stock;
       }
@@ -4313,6 +4358,14 @@ function handleWS(msg) {
       break;
     }
 
+    case 'gift_restock': {
+      GIFT_RESTOCK = msg.restock || null;
+      for (const [id, st] of Object.entries(msg.stocks || {})) giftStock[id] = st;
+      const grid = document.getElementById('giftGrid');
+      if (grid && grid.offsetParent) renderGiftGrid();
+      if (msg.restock) showToast('Подарки вернулись!', `🎁 ${msg.names} снова в магазине — по ${msg.amount} шт., только 2 часа`, '🎁', '#7a3cf0');
+      break;
+    }
     case 'stock_update':
     case 'gift_stock_update': {
       // Single gift stock changed (someone bought one)
@@ -4679,6 +4732,7 @@ function handleWS(msg) {
 
     case 'velosipe_market': case 'velosipe_trade_ok': case 'velosipe_error':
     case 'velosipe_history': case 'velosipe_tick': case 'velosipe_limit': case 'market_news': case 'nft_listings': case 'gm_done':
+    case 'velosipe_liq':
       vlpHandle(msg); break;
 
     case 'stars_unlim': {
@@ -6662,7 +6716,7 @@ function updateDailyBtn() {
   if (canClaimDaily()) {
     btn.disabled = false;
     txt.textContent = 'Получить ежедневную награду';
-    cd.textContent = '+500 ⭐';
+    cd.textContent = '+100 ⭐';
   } else {
     btn.disabled = true;
     txt.textContent = 'Следующая награда через';
@@ -6759,6 +6813,10 @@ const GIFTS = [
   { id:'zombie',       name:'Zombie',       price:9999999, stock:100, limited:true  },
   { id:'facepalm',     name:'Facepalm',     price:3000,    stock:5,   limited:true  },
   { id:'medal',        name:'Medal',        price:7777,    stock:66,  limited:true  },
+  { id:'peach',        name:'Peach',        price:5000,    stock:35,  limited:true  },
+  { id:'rolex_watch',  name:'Watch',        price:2500,    stock:40,  limited:true  },
+  { id:'signet_ring',  name:'Signet Ring',  price:10000,   stock:10,  limited:true  },
+  { id:'cigarette',    name:'Cigarette',    price:1500,    stock:25,  limited:true  },
   { id:'test_nft',     name:'Test NFT',     price:1500,  stock:50,   limited:true,  adminOnly:true },
   { id:'test_nft_1',   name:'Test NFT 1',   price:7777,  stock:5,    limited:true,  adminOnly:true },
   { id:'Shard_test',   name:'Shard test',   price:999,   stock:25,   limited:true,  adminOnly:true },
@@ -6767,6 +6825,7 @@ const GIFTS = [
 
 // Track remaining stock (runtime)
 const giftStock = {};
+let GIFT_RESTOCK = null; // {until, ids} — распроданные подарки ненадолго вернулись в магазин
 GIFTS.forEach(g => { giftStock[g.id] = g.stock; });
 
 // Admin authorization state (unlocked via /l in Nethgram bot)
@@ -6822,7 +6881,7 @@ const giftCardObserver = new IntersectionObserver((entries) => {
 const GIFT_FALLBACK_EMOJI = {
   candy_cane:'🍬', wine:'🍷', lollipop:'🍭', scared_cat:'🐈', heart:'❤', spy_agaric:'🍄',
   cake:'🍰', astral_shard:'🔮', plush_pepe:'🐸', duck:'🦆', durov_cap:'🧢', lime:'🍋',
-  zombie:'🧟', facepalm:'🤦', medal:'🏅', test_gift_1:'🎁', test_gift_2:'🎁', test_nft:'✨',
+  zombie:'🧟', facepalm:'🤦', medal:'🏅', peach:'🍑', rolex_watch:'⌚', signet_ring:'💍', cigarette:'🚬', test_gift_1:'🎁', test_gift_2:'🎁', test_nft:'✨',
   test_nft_1:'✨', Shard_test:'💎', Test_flower:'🌸'
 };
 
@@ -6996,7 +7055,9 @@ function renderGiftGrid() {
     // Admin badge for admin-only gifts
     const adminBadge = gift.adminOnly
       ? `<div class="gift-admin-badge">🔒 ADMIN</div>`
-      : '';
+      : (!soldOut && GIFT_RESTOCK && GIFT_RESTOCK.until > Date.now() && GIFT_RESTOCK.ids.includes(gift.id))
+        ? `<div class="gift-restock-badge">⏳ до ${new Date(GIFT_RESTOCK.until).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' })}</div>`
+        : '';
 
     card.innerHTML = `
       ${soldOut ? '<div class="gift-sold-badge">SOLD OUT</div>' : ''}
@@ -7964,7 +8025,7 @@ function closeGiftView() {
 }
 
 // ── ПРОДАЖА ПОДАРКА ЗА ЗВЁЗДЫ (только обычные подарки, не NFT) ──
-const GIFT_SELL_RATE = 0.85; // должно совпадать с сервером
+const GIFT_SELL_RATE = 0.6; // должно совпадать с сервером
 function giftSellValue(g) { return Math.floor((g && g.giftPrice || 0) * GIFT_SELL_RATE); }
 function sellGiftForStars() {
   const g = giftViewCurrentGift;
@@ -10377,9 +10438,11 @@ function liveMe() { // пересчёт стоимости монет по св�
   const held = me.vlp + me.locked, valueStars = Math.floor(held * m.rate), pnl = held ? valueStars - me.basis : 0;
   return { ...me, valueStars, pnl, pnlPct: me.basis > 0 ? (pnl / me.basis) * 100 : 0 };
 }
+function vxFees() { return (VLP.market && VLP.market.fees) || { trade:0.05, vlp:0.03, liq:0.1, levs:[1, 2, 5, 10] }; }
+const vxLevTag = p => (p.lev || 1) > 1 ? ` <span class="vx-lev">×${p.lev}</span>` : '';
 function livePos(p) {
   const a = VLP.assets.find(x => x.id === p.assetId); if (!a) return p;
-  const value = Math.floor(p.units * a.rate), pnl = value - p.cost;
+  const value = Math.max(0, Math.floor(p.units * a.rate - (p.debt || 0))), pnl = value - p.cost;
   return { ...p, value, pnl, pnlPct: p.cost ? (pnl / p.cost) * 100 : 0 };
 }
 
@@ -10739,9 +10802,37 @@ function patchTicker() {
 // ── вкладка «Активы» ──
 function assetCard(a, i) {
   const ch = vlpLiveChange(a);
-  return `<div class="vx-asset ${vCls(ch)}${vIn()}"${vSt(i)} onclick="openAsset('${a.id}')"><div class="vx-aico">${a.icon}</div>
+  return `<div class="vx-asset ${vCls(ch)}${vIn()}"${vSt(i)} data-aid="${a.id}" onclick="openAsset('${a.id}')"><div class="vx-aico">${a.icon}</div>
     <div class="vx-ainfo"><b>${vEsc(a.name)}</b><small>${a.category === 'stock' ? 'Акции' : 'Актив'}</small><div class="vx-aprice">${v2(a.rate)} ${vStar()}</div></div>
     <div class="vx-aright">${vxSpark(a.spark, ch >= 0)}<span class="vx-chg ${vCls(ch)}">${vArrow(ch)} ${vPct(ch)}</span></div></div>`;
+}
+/* На тике меняем только цену, процент и мини-график — без пересборки всей вкладки (важно на телефонах) */
+function vxPatchCards() {
+  const body = $('vlpBody'); if (!body) return false;
+  if (VLP.tab === 'assets') {
+    const cards = body.querySelectorAll('[data-aid]'); if (!cards.length) return false;
+    cards.forEach(el => {
+      const a = VLP.assets.find(x => x.id === el.dataset.aid); if (!a) return;
+      const ch = vlpLiveChange(a);
+      el.classList.remove('up', 'down', 'flat'); el.classList.add(vCls(ch));
+      el.querySelector('.vx-aprice').innerHTML = `${v2(a.rate)} ${vStar()}`;
+      el.querySelector('.vx-aright').innerHTML = `${vxSpark(a.spark, ch >= 0)}<span class="vx-chg ${vCls(ch)}">${vArrow(ch)} ${vPct(ch)}</span>`;
+    });
+    return true;
+  }
+  if (VLP.tab === 'gifts') {
+    const cards = body.querySelectorAll('[data-gid]'); if (!cards.length) return false;
+    cards.forEach(el => {
+      const g = (VLP.gifts || []).find(x => x.id === el.dataset.gid); if (!g) return;
+      const ch = vlpLiveChange({ id:'g_' + g.id, rate:g.rate, periodChange:g.periodChange });
+      el.classList.remove('up', 'down', 'flat'); el.classList.add(vCls(ch));
+      el.querySelector('.vx-ainfo').innerHTML = giftCardInfo(g);
+      el.querySelector('.vx-aright').innerHTML = `${vxSpark(g.spark, ch >= 0)}<span class="vx-chg ${vCls(ch)}">${vArrow(ch)} ${vPct(ch)}</span>`;
+      el.querySelector('.vx-gbtns').innerHTML = giftCardBtns(g);
+    });
+    return true;
+  }
+  return false;
 }
 function paneAssets() {
   const list = VLP.assets.filter(a => VLP.filter === 'all' || a.category === VLP.filter);
@@ -10776,15 +10867,22 @@ function vlpRerenderGifts(force) {
   if (!force && ae && ae.closest && ae.closest('#vlpBody') && ae.tagName === 'INPUT') return;
   VLP.enter = false; renderPane({});
 }
-function giftMarketCard(g, i) {
-  const ch = vlpLiveChange({ id:'g_' + g.id, rate:g.rate, periodChange:g.periodChange }), own = vlpGiftCount(g.id);
+function giftCardInfo(g) {
   const stock = g.stock == null ? 'всегда в наличии' : g.stock > 0 ? 'на бирже ' + vN(g.stock) + ' шт.' : 'на бирже нет';
-  return `<div class="vx-asset vx-gcard ${vCls(ch)}${vIn()}"${vSt(i)}>
+  return `<b>${vEsc(g.name)}</b><small>${stock} · ${g.capped ? 'в магазине ' + vN(g.price) + ' ⭐ · выкуп ограничен' : 'в магазине нет'}</small><div class="vx-aprice">${v2(g.rate)} ${vStar()}</div>`;
+}
+function giftCardBtns(g) {
+  const own = vlpGiftCount(g.id);
+  return `<button class="vx-btn buy sm" onclick="gmBuy('${g.id}')" ${g.stock === 0 ? 'disabled' : ''}>Купить · ${vN(g.buy)} ⭐</button>
+      <button class="vx-btn sell sm" onclick="gmSell('${g.id}')" ${own ? '' : 'disabled'}>Продать · ${vN(g.sell)} ⭐${own ? ' <i>×' + own + '</i>' : ''}</button>`;
+}
+function giftMarketCard(g, i) {
+  const ch = vlpLiveChange({ id:'g_' + g.id, rate:g.rate, periodChange:g.periodChange });
+  return `<div class="vx-asset vx-gcard ${vCls(ch)}${vIn()}"${vSt(i)} data-gid="${g.id}">
     <div class="vx-aico vx-gico">${vxStill(g.id, GIFT_FALLBACK_EMOJI[g.id] || '🎁')}</div>
-    <div class="vx-ainfo"><b>${vEsc(g.name)}</b><small>${stock} · магазин ${vN(g.price)} ⭐</small><div class="vx-aprice">${v2(g.rate)} ${vStar()}</div></div>
+    <div class="vx-ainfo">${giftCardInfo(g)}</div>
     <div class="vx-aright">${vxSpark(g.spark, ch >= 0)}<span class="vx-chg ${vCls(ch)}">${vArrow(ch)} ${vPct(ch)}</span></div>
-    <div class="vx-gbtns"><button class="vx-btn buy sm" onclick="gmBuy('${g.id}')" ${g.stock === 0 ? 'disabled' : ''}>Купить · ${vN(g.buy)} ⭐</button>
-      <button class="vx-btn sell sm" onclick="gmSell('${g.id}')" ${own ? '' : 'disabled'}>Продать · ${vN(g.sell)} ⭐${own ? ' <i>×' + own + '</i>' : ''}</button></div></div>`;
+    <div class="vx-gbtns">${giftCardBtns(g)}</div></div>`;
 }
 function nftLotCard(l, i) {
   const n = l.nft, mine = myUser && l.sellerId === myUser.id;
@@ -10811,7 +10909,9 @@ function paneGifts() {
   return `<div class="vlx-wrap">
     <div class="vx-card${vIn()}" style="margin-bottom:16px"><div class="vx-h">Как это работает</div><div class="vx-desc">
       У каждого подарка свой курс в звёздах — он скачет как на бирже: пампы, обвалы, новости.
-      Покупайте подарки на просадке и продавайте бирже на пампе. Лимитированные подарки биржа продаёт только из того, что ей продали игроки.
+      Покупайте подарки на просадке и продавайте бирже на пампе — но биржа берёт разницу ~8% с каждой стороны, так что быстрая перепродажа почти всегда в минус.
+      Пока подарок продаётся в магазине, биржа выкупает его не дороже ${Math.round(GIFT_SELL_RATE * 100)}% от цены магазина. Дорого продать можно только распроданные подарки.
+      Лимитированные подарки биржа продаёт только из того, что ей продали игроки.
       NFT торгуются между игроками: выставьте свой за любую цену — звёзды придут, когда его купят.</div></div>
     <div class="vx-h">Курс подарков</div>
     <div class="vx-assets">${gifts.map(giftMarketCard).join('')}</div>
@@ -10843,11 +10943,12 @@ function panePortfolio() {
   const hist = VLP.market.history.slice(-36).map(p => p.r), ch = vlpLiveChange({ rate:VLP.market.rate, periodChange:VLP.market.periodChange });
   const posHtml = pos.length ? pos.map((p, i) => {
     const a = VLP.assets.find(x => x.id === p.assetId), up = p.pnl >= 0;
-    return `<div class="vx-pos${vIn()}"${vSt(i + 2)}><div class="top"><div class="vx-aico">${p.icon}</div><div class="nm"><b>${vEsc(p.name)}</b><small>вложено в ${p.currency === 'vlp' ? '$VLP' : '⭐'}</small></div>
+    const lev = p.lev || 1;
+    return `<div class="vx-pos${vIn()}"${vSt(i + 2)}><div class="top"><div class="vx-aico">${p.icon}</div><div class="nm"><b>${vEsc(p.name)}${vxLevTag(p)}</b><small>вложено в ${p.currency === 'vlp' ? '$VLP' : '⭐'}${lev > 1 ? ' · ликвидация при ' + v2(p.liqRate) + ' ⭐' : ''}</small></div>
         ${vxSpark(a && a.spark, up)}</div>
       <div class="row"><span>Вложено <b>${vN(p.cost)} ${vCur(p.currency)}</b></span><span>Сейчас <b>${vN(p.value)} ${vCur(p.currency)}</b></span>
         <span class="${vCls(p.pnl)}"><b>${p.pnl >= 0 ? '+' : '−'}${vN(Math.abs(p.pnl))} (${vPct(p.pnlPct)})</b></span></div>
-      <div class="vx-btns"><button class="vx-btn buy sm" onclick="openTrade('invest','${p.assetId}','${p.currency}')">Докупить</button><button class="vx-btn sell sm" onclick="openTrade('divest','${p.assetId}','${p.currency}')">Продать</button></div></div>`;
+      <div class="vx-btns"><button class="vx-btn buy sm" onclick="openTrade('invest','${p.assetId}','${p.currency}',${lev})">Докупить</button><button class="vx-btn sell sm" onclick="openTrade('divest','${p.assetId}','${p.currency}',${lev})">Продать</button></div></div>`;
   }).join('') : '<div class="vx-empty">Вы пока ничего не инвестировали.<br>Откройте «Активы» и вложите ⭐ или $VLP.</div>';
   return `<div class="vlx-wrap"><div class="vx-grid2"><div class="vx-col">
       <div class="vx-card${vIn()}"${vSt(0)}><div class="vx-h">Структура портфеля</div><div class="vx-net">
@@ -10868,7 +10969,8 @@ function paneHistory() {
     else if (t.type === 'sell') { ic = svgIc('trendDown',20); t1 = `Продано ${vN(t.amount)} $VLP`; t2 = `по ${v2(t.rate)} ⭐`; am = `<span class="up">+${vN(t.stars)}</span> ${vStar()}`; }
     else if (t.type === 'gbuy' || t.type === 'nbuy') { ic = t.giftId ? (GIFT_FALLBACK_EMOJI[t.giftId] || '🎁') : '✨'; t1 = (t.type === 'gbuy' ? 'Куплен подарок: ' : 'Куплен NFT: ') + vEsc(t.assetName); t2 = t.type === 'gbuy' ? 'у биржи' : 'на NFT-маркете'; am = `<span class="down">−${vN(t.amount)}</span> ${vStar()}`; }
     else if (t.type === 'gsell' || t.type === 'nsell') { ic = t.giftId ? (GIFT_FALLBACK_EMOJI[t.giftId] || '🎁') : '💸'; t1 = (t.type === 'gsell' ? 'Продан подарок: ' : 'Продан NFT: ') + vEsc(t.assetName); t2 = t.type === 'gsell' ? 'бирже' : 'на NFT-маркете'; am = `<span class="up">+${vN(t.amount)}</span> ${vStar()}`; }
-    else if (t.type === 'invest') { ic = t.icon || svgIc('briefcase',20); t1 = `Инвестиция: ${vEsc(t.assetName)}`; t2 = 'вложено'; am = `<span class="down">−${vN(t.amount)}</span> ${vCur(t.currency)}`; }
+    else if (t.type === 'liq') { ic = '💀'; t1 = `Ликвидация: ${vEsc(t.assetName)} ×${t.lev}`; t2 = '<span class="down">позиция сгорела</span>'; am = `<span class="down">−${vN(t.amount)}</span> ${vCur(t.currency)}`; }
+    else if (t.type === 'invest') { ic = t.icon || svgIc('briefcase',20); t1 = `Инвестиция: ${vEsc(t.assetName)}${(t.lev || 1) > 1 ? ' ×' + t.lev : ''}`; t2 = 'вложено'; am = `<span class="down">−${vN(t.amount)}</span> ${vCur(t.currency)}`; }
     else { ic = t.icon || svgIc('coin',20); t1 = `Продажа: ${vEsc(t.assetName)}`; t2 = `<span class="${vCls(t.pnl)}">${t.pnl >= 0 ? 'прибыль +' : 'убыток −'}${vN(Math.abs(t.pnl))}</span>`; am = `<span class="up">+${vN(t.amount)}</span> ${vCur(t.currency)}`; }
     return `<div class="vx-row"><div class="bd">${ic}</div><div class="mid"><div class="t1">${t1}</div><div class="t2">${t2} · ${vDate(t.ts)}</div></div><div class="am">${am}</div></div>`;
   }).join('')}</div></div>`;
@@ -10918,7 +11020,7 @@ function patchSheet(opts = {}) {
   $('vxSDesc').textContent = a.desc; renderSheetTool();
   $('vxSChips').innerHTML = chipsHtml(vxStats(VLP.sheetPoints));
   const hasPos = pos.length > 0;
-  $('vxSPos').innerHTML = `<div class="vx-card"><div class="vx-h">Моя позиция</div>${hasPos ? pos.map(p => `<div class="vx-pnl"><div><small>${p.currency === 'vlp' ? 'В $VLP' : 'В звёздах'}</small><b>${vN(p.value)} ${vCur(p.currency)}</b></div>
+  $('vxSPos').innerHTML = `<div class="vx-card"><div class="vx-h">Моя позиция</div>${hasPos ? pos.map(p => `<div class="vx-pnl" onclick="openTrade('divest','${p.assetId}','${p.currency}',${p.lev || 1})" style="cursor:pointer"><div><small>${p.currency === 'vlp' ? 'В $VLP' : 'В звёздах'}${vxLevTag(p)}${(p.lev || 1) > 1 ? ' · ликв. ' + v2(p.liqRate) : ''}</small><b>${vN(p.value)} ${vCur(p.currency)}</b></div>
       <b class="${vCls(p.pnl)}">${vArrow(p.pnl)} ${p.pnl >= 0 ? '+' : '−'}${vN(Math.abs(p.pnl))} (${vPct(p.pnlPct)})</b></div>`).join('') : '<div class="vx-desc" style="margin-bottom:12px">Вы ещё не вкладывались в этот актив.</div>'}
     <div class="vx-btns"><button class="vx-btn buy" onclick="openTrade('invest','${a.id}')">Купить</button><button class="vx-btn sell" onclick="openTrade('divest','${a.id}')" ${hasPos ? '' : 'disabled'}>Продать</button></div></div>`;
   $('vxSheetDock').innerHTML = `<div class="vx-btns"><button class="vx-btn buy" onclick="openTrade('invest','${a.id}')">Купить</button><button class="vx-btn sell" onclick="openTrade('divest','${a.id}')" ${hasPos ? '' : 'disabled'}>Продать</button></div>`;
@@ -10936,22 +11038,26 @@ function vxBurst(kind) {
     fx.appendChild(s); setTimeout(() => s.remove(), 1700);
   }
 }
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && VLP.open && VLP.stale) { VLP.stale = false; VLP.enter = false; VLP.built = null; renderAll({ chart:true, intro:false }); }
+});
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || !VLP.open) return;
   if (VLP.trade) closeTrade(); else if (VLP.sheetId) closeAsset(); else closeVelosipe();
 });
 
 // ── окно сделки ──
-function openTrade(mode, assetId, currency) {
-  const pos = assetId ? VLP.positions.find(p => p.assetId === assetId) : null;
-  VLP.trade = { mode, assetId: assetId || null, currency: currency || (mode === 'divest' && pos ? pos.currency : 'stars'), all:false, pending:false };
+function openTrade(mode, assetId, currency, lev) {
+  const pos = assetId ? VLP.positions.find(p => p.assetId === assetId && (!currency || p.currency === currency) && (!lev || (p.lev || 1) === lev)) : null;
+  VLP.trade = { mode, assetId: assetId || null, currency: currency || (mode === 'divest' && pos ? pos.currency : 'stars'),
+                lev: lev || (mode === 'divest' && pos ? pos.lev || 1 : 1), all:false, pending:false };
   document.getElementById('vlpTrade').classList.add('open'); renderTrade();
   setTimeout(() => { const i = document.getElementById('vlpAmt'); if (i) i.focus(); }, 50);
 }
 function closeTrade() { VLP.trade = null; document.getElementById('vlpTrade').classList.remove('open'); }
 function tradeCtx() {
   const T = VLP.trade, m = VLP.market, me = liveMe(), a = T.assetId ? VLP.assets.find(x => x.id === T.assetId) : null;
-  const pos = a ? VLP.positions.map(livePos).find(p => p.assetId === a.id && p.currency === T.currency) : null;
+  const pos = a ? VLP.positions.map(livePos).find(p => p.assetId === a.id && p.currency === T.currency && (p.lev || 1) === (T.lev || 1)) : null;
   return { T, m, me, a, pos };
 }
 function renderTrade() {
@@ -10963,10 +11069,19 @@ function renderTrade() {
     buy: vlpBuySub(m, me),
     sell:`Доступно: ${vN(me.vlp)} $VLP · курс ${vRate(m.rate)} ⭐`,
     invest: a ? `Цена: ${vRate(a.rate)} ⭐ за ед. · у вас ${T.currency === 'vlp' ? vN(me.vlp) + ' $VLP' : vStars() + ' ⭐'}` : '',
-    divest: pos ? `Позиция: ${vN(pos.value)} ${T.currency === 'vlp' ? '$VLP' : '⭐'}` : 'У вас нет такой позиции',
+    divest: pos ? `Позиция${(pos.lev || 1) > 1 ? ' ×' + pos.lev : ''}: ${vN(pos.value)} ${T.currency === 'vlp' ? '$VLP' : '⭐'}` : 'У вас нет такой позиции',
   };
-  const seg = (T.mode === 'invest' || T.mode === 'divest')
+  const F = vxFees(), levBtns = list => `<div class="vlp-seg vlp-lev">${list.map(l => `<button class="${(T.lev || 1) === l ? 'on' : ''}" onclick="tradeLev(${l})">${l === 1 ? 'Без плеча' : '×' + l}</button>`).join('')}</div>`;
+  let seg = (T.mode === 'invest' || T.mode === 'divest')
     ? `<div class="vlp-seg"><button class="${T.currency === 'stars' ? 'on' : ''}" onclick="tradeCurrency('stars')">⭐ Звёзды</button><button class="${T.currency === 'vlp' ? 'on' : ''}" onclick="tradeCurrency('vlp')">$VLP</button></div>` : '';
+  if (T.mode === 'invest' && T.currency === 'stars') {
+    seg += levBtns(F.levs);
+    if ((T.lev || 1) > 1) seg += `<div class="vlp-warn">⚠️ Плечо ×${T.lev}: курс упадёт примерно на ${Math.max(1, Math.round((1 - F.trade - F.liq) / ((1 - F.trade) * T.lev) * 100))}% — и вложенное сгорит целиком</div>`;
+  }
+  if (T.mode === 'divest' && a) {
+    const levs = [...new Set(VLP.positions.filter(p => p.assetId === a.id && p.currency === T.currency).map(p => p.lev || 1))];
+    if (levs.length > 1) seg += levBtns(levs);
+  }
   const unit = (T.mode === 'buy' || T.mode === 'sell' || T.currency === 'vlp') ? '$VLP' : '⭐';
   const cls = (T.mode === 'buy' || T.mode === 'invest') ? 'buy' : 'sell';
   const verb = { buy:'Купить', sell:'Продать', invest:'Инвестировать', divest:'Продать' }[T.mode];
@@ -10994,7 +11109,8 @@ function tradeQuickSet(i) {
   const b = VLP.trade.quick[i], el = document.getElementById('vlpAmt');
   el.value = b.value ? vN(b.value).replace(/\s/g, '') : ''; VLP.trade.all = !!b.all; tradeInput(true);
 }
-function tradeCurrency(c) { VLP.trade.currency = c; renderTrade(); }
+function tradeCurrency(c) { VLP.trade.currency = c; if (c === 'vlp') VLP.trade.lev = 1; renderTrade(); }
+function tradeLev(l) { VLP.trade.lev = l; renderTrade(); }
 function tradeInput(keepAll) {
   if (!VLP.trade) return;
   if (keepAll !== true) VLP.trade.all = false;
@@ -11002,10 +11118,14 @@ function tradeInput(keepAll) {
   const n = parseInt(el.value || '0', 10), { T, m, a } = tradeCtx(), sum = document.getElementById('vlpSum');
   document.getElementById('vlpErr').textContent = '';
   if (!n) { sum.textContent = ''; return; }
-  if (T.mode === 'buy') sum.innerHTML = `К оплате: ${vN(Math.ceil(n * m.rate - 1e-9))} ${vStar()}`;
-  else if (T.mode === 'sell') sum.innerHTML = `Вы получите: ${vN(Math.floor(n * m.rate))} ${vStar()}`;
-  else if (T.mode === 'invest' && a) sum.textContent = `Вы получите ≈ ${(n / a.rate).toFixed(2)} ед. актива`;
-  else sum.innerHTML = `Вы получите ≈ ${vN(n)} ${vCur(T.currency)}`;
+  const F = vxFees(), pc = x => Math.round(x * 100) + '%';
+  if (T.mode === 'buy') sum.innerHTML = `К оплате: ${vN(Math.ceil(n * m.rate * (1 + F.vlp) - 1e-9))} ${vStar()} <small>(комиссия ${pc(F.vlp)})</small>`;
+  else if (T.mode === 'sell') sum.innerHTML = `Вы получите: ${vN(Math.floor(n * m.rate * (1 - F.vlp)))} ${vStar()} <small>(комиссия ${pc(F.vlp)})</small>`;
+  else if (T.mode === 'invest' && a) {
+    const lev = T.lev || 1, net = n * (1 - F.trade), units = net * lev / a.rate, liq = lev > 1 ? (net * (lev - 1) + n * F.liq) / units : 0;
+    sum.innerHTML = `≈ ${units.toFixed(2)} ед. · комиссия ${vN(Math.ceil(n * F.trade))} ⭐${lev > 1 ? `<br><b class="down">Ликвидация при курсе ${v2(liq)} ⭐</b>` : ''}`;
+  }
+  else sum.innerHTML = `Вы получите ≈ ${vN(Math.floor(n * (1 - F.trade)))} ${vCur(T.currency)} <small>(комиссия ${pc(F.trade)})</small>`;
 }
 function tradeSubmit() {
   const T = VLP.trade; if (!T || T.pending) return;
@@ -11016,8 +11136,8 @@ function tradeSubmit() {
   const base = { period: VLP.period };
   if (T.mode === 'buy') wsSend({ type:'buy_velosipe', amount:n, ...base });
   else if (T.mode === 'sell') wsSend({ type:'sell_velosipe', amount:n, ...base });
-  else if (T.mode === 'invest') wsSend({ type:'invest_asset', assetId:T.assetId, currency:T.currency, amount:n, ...base });
-  else wsSend({ type:'sell_position', assetId:T.assetId, currency:T.currency, amount:n, all:T.all, ...base });
+  else if (T.mode === 'invest') wsSend({ type:'invest_asset', assetId:T.assetId, currency:T.currency, amount:n, lev:T.lev || 1, ...base });
+  else wsSend({ type:'sell_position', assetId:T.assetId, currency:T.currency, amount:n, all:T.all, lev:T.lev || 1, ...base });
 }
 
 // ── сообщения сервера ──
@@ -11090,9 +11210,10 @@ function vlpHandle(msg) {
         Object.assign(g, u); if (g.spark) { g.spark.push(u.rate); if (g.spark.length > 36) g.spark.shift(); }
       });
       if (!VLP.open) break;
-      if (VLP.tab === 'gifts') vlpRerenderGifts();
+      if (document.hidden) { VLP.stale = true; break; } // вкладка свёрнута — не тратим батарею
+      if (VLP.tab === 'gifts' || VLP.tab === 'assets') { if (!vxPatchCards()) { VLP.enter = false; renderPane({}); } }
       if (VLP.tab === 'market') patchMarket({ pt:{ t:msg.t, r:msg.market.rate } });
-      else if (VLP.tab === 'assets' || VLP.tab === 'portfolio') { VLP.enter = false; renderPane({}); }
+      else if (VLP.tab === 'portfolio') { VLP.enter = false; renderPane({}); }
       renderStarChips(); patchTicker();
       if (VLP.sheetId) {
         const a = VLP.assets.find(x => x.id === VLP.sheetId);
@@ -11102,6 +11223,10 @@ function vlpHandle(msg) {
     }
     case 'velosipe_limit':
       vlpApplySharedLimit(msg.bought);
+      break;
+    case 'velosipe_liq':
+      showToast('VELO$IPE', msg.text, 'logo', '#ff5c5c');
+      if (VLP.open) vlpRequest();
       break;
     case 'nft_listings':
       VLP.listings = msg.listings || [];
