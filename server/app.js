@@ -1362,6 +1362,34 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     return { text: '👥 Пользователи (' + all.length + ', онлайн ' + online + '):\n\n' + lines.join('\n') };
   }
 
+  // /bs — балансы всех пользователей в звёздах: звёзды + $VLP по курсу + вложения в активы
+  if (t === '/bs' || t.startsWith('/bs ')) {
+    if (!isAdmin) return { text: '🔒 Команда доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
+    const all = [...users.values()];
+    if (all.length === 0) return { text: '👥 Пользователей пока нет.' };
+    const fmt = n => Math.floor(n).toLocaleString('ru-RU');
+    const rows = all.map(u => {
+      const stars = userStars.get(u.id) || 0, unlim = stars >= UNLIMITED_STARS;
+      const rec = userVelosipe.get(u.id), vlp = rec ? rec.balance : 0;
+      let inv = 0;
+      for (const p of (userPositions.get(u.id) || [])) {
+        const a = assetsMarket.get(p.assetId); if (!a) continue;
+        const v = posValue(p, a.rate);
+        inv += p.currency === 'vlp' ? v * velosipe.rate : v;
+      }
+      const vlpStars = vlp * velosipe.rate;
+      return { u, stars, unlim, vlp, vlpStars, inv, total: (unlim ? 0 : stars) + vlpStars + inv };
+    }).sort((a, b) => (b.unlim - a.unlim) || (b.total - a.total));
+    let sum = 0;
+    const lines = rows.map((r, i) => {
+      if (!r.unlim) sum += r.total;
+      return (i + 1) + '. ' + (r.u.name || 'Без имени') + (r.u.username ? ' (@' + r.u.username + ')' : '') + ' — ' +
+        (r.unlim ? '∞' : fmt(r.total)) + ' ⭐\n     ⭐ ' + (r.unlim ? '∞' : fmt(r.stars)) +
+        ' · $VLP ' + fmt(r.vlp) + ' (≈' + fmt(r.vlpStars) + ' ⭐) · активы ≈' + fmt(r.inv) + ' ⭐';
+    });
+    return { text: '💰 Балансы (' + all.length + ' польз., курс $VLP ' + velosipe.rate.toLocaleString('ru-RU') + ' ⭐)\nВсего ≈ ' + fmt(sum) + ' ⭐ (без бесконечных)\n\n' + lines.join('\n') };
+  }
+
   // /alogs — список администраторов
   if (t === '/alogs' || t.startsWith('/alogs ')) {
     if (!isAdmin) return { text: '🔒 Команда /alogs доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
