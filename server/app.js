@@ -110,12 +110,12 @@ const GIFT_DEFS = [
   { id:'cake',        name:'Cake',        price:500,   stock:30,    limited:true  },
   { id:'astral_shard',name:'Crystal Ball',price:555,   stock:15,  limited:true  },
   { id:'plush_pepe',  name:'Plush Pepe',  price:2000,  stock:50,   limited:true  },
-  { id:'duck',        name:'Duck',        price:7000,  stock:50,    limited:true },
+  { id:'duck',        name:'Duck',        price:7000,  stock:50,    limited:true, hidden:true },
   { id:'durov_cap',   name:'Durov Cap',   price:10000, stock:100,   limited:true },
-  { id:'lime',        name:'Lime',        price:1000000, stock:15,  limited:true  },
-  { id:'zombie',      name:'Zombie',      price:9999999, stock:100, limited:true  },
+  { id:'lime',        name:'Lime',        price:1000000, stock:15,  limited:true, hidden:true },
+  { id:'zombie',      name:'Zombie',      price:9999999, stock:100, limited:true, hidden:true },
   { id:'facepalm',    name:'Facepalm',    price:3000,    stock:5,   limited:true  },
-  { id:'medal',       name:'Medal',       price:7777,    stock:66,  limited:true  },
+  { id:'medal',       name:'Medal',       price:7777,    stock:66,  limited:true, hidden:true },
   { id:'peach',       name:'Peach',       price:5000,    stock:35,  limited:true  },
   { id:'rolex_watch', name:'Watch',       price:2500,    stock:40,  limited:true  },
   { id:'signet_ring', name:'Signet Ring', price:10000,   stock:10,  limited:true  },
@@ -279,10 +279,11 @@ const LEVERAGES = [1, 2, 5, 10];   // кредитное плечо для вл�
 const LIQ_LEVEL = 0.1;             // ликвидация, когда от вложенного осталось 10%            // каждая сделка двигает курс на 1%
 const giftMarket  = new Map();     // giftId -> {rate, prevRate, series, stock, ev, trend}
 const nftListings = [];            // [{id, sellerId, sellerName, price, ts, nft}]
-const GIFT_DEFS_TRADABLE = () => GIFT_DEFS.filter(d => !d.adminOnly);
+// hidden — подарок скрыт: не продаётся в магазине, не торгуется на бирже, не возвращается; у владельцев остаётся
+const GIFT_DEFS_TRADABLE = () => GIFT_DEFS.filter(d => !d.adminOnly && !d.hidden);
 /** Можно ли сейчас купить подарок в магазине по фиксированной цене */
 function shopSells(def) {
-  if (globalSoldOut || def.adminOnly) return false;
+  if (globalSoldOut || def.adminOnly || def.hidden) return false;
   if (!def.limited) return true;
   return (giftStock.get(def.id) || 0) > 0;
 }
@@ -698,7 +699,7 @@ function countUsedGifts() {
 function startGiftRestock() {
   const used = countUsedGifts(), ids = [];
   for (const def of GIFT_DEFS) {
-    if (!def.limited || def.adminOnly || (giftStock.get(def.id) || 0) > 0) continue;
+    if (!def.limited || def.adminOnly || def.hidden || (giftStock.get(def.id) || 0) > 0) continue;
     // довыпуск: ровно RESTOCK_AMOUNT штук сверх того, что уже выдано
     giftRestock.extra[def.id] = Math.max(giftRestock.extra[def.id] || 0, (used.get(def.id) || 0) + RESTOCK_AMOUNT - def.stock);
     giftStock.set(def.id, RESTOCK_AMOUNT);
@@ -1291,6 +1292,17 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     if (!tu) { for (const u of users.values()) { if ((u.name || '').toLowerCase() === target.toLowerCase()) { tu = u; break; } } }
     if (!tu) return { text: '❌ Пользователь "' + target + '" не найден.' };
     return { text: '⭐ Отправлено ' + amt.toLocaleString('ru-RU') + ' звёзд пользователю ' + (tu.name || tu.id) + (tu.username ? ' (@' + tu.username + ')' : '') + '.', giveStars: { toId: tu.id, amount: amt } };
+  }
+
+  // /limvlp — сбросить общий дневной лимит покупки $VLP
+  if (t === '/limvlp' || t.startsWith('/limvlp ')) {
+    if (!isAdmin) return { text: '🔒 Команда доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
+    const was = sharedVlpDaily();
+    velosipe.dailyDate = dayKey(); velosipe.dailyBought = 0;
+    for (const rec of userVelosipe.values()) { rec.boughtToday = 0; rec.boughtDate = dayKey(); }
+    scheduleSave();
+    broadcastAll(null, { type:'velosipe_limit', bought:0, limit:VLP_DAILY_LIMIT });
+    return { text: '✅ Лимит $VLP сброшен: было куплено ' + was.toLocaleString('ru-RU') + ' / ' + VLP_DAILY_LIMIT.toLocaleString('ru-RU') + ', теперь снова доступно ' + VLP_DAILY_LIMIT.toLocaleString('ru-RU') + ' $VLP.' };
   }
 
   // /sr — скрытая команда: обнулить звёзды у всех пользователей (нужно подтверждение)
@@ -2652,7 +2664,7 @@ server.on('upgrade', (req, socket) => {
           if (!gDef) { giftFail('Подарок не найден'); break; }
           if (!users.has(toId)) { giftFail('Получатель не найден'); break; }
           const isBotAdmin = nethgramAdminUsers.has(userId);
-          if (gDef.adminOnly && !isBotAdmin) { giftFail('Этот подарок недоступен'); break; }
+          if ((gDef.adminOnly || gDef.hidden) && !isBotAdmin) { giftFail('Этот подарок недоступен'); break; }
           if (globalSoldOut && !isBotAdmin) { giftFail('Магазин временно закрыт'); break; }
           const gStock = giftStock.get(gDef.id);
           if (gStock !== null && gStock !== undefined && gStock <= 0) { giftFail('Подарок распродан!'); break; }
@@ -3287,7 +3299,7 @@ server.on('upgrade', (req, socket) => {
         if (!ch.members.has(userId)) { chFail('Вы не участник этого канала'); break; }
         if (!giftDef) { chFail('Подарок не найден'); break; }
         const isBotAdmin = nethgramAdminUsers.has(userId);
-        if (giftDef.adminOnly && !isBotAdmin) { chFail('Этот подарок недоступен'); break; }
+        if ((giftDef.adminOnly || giftDef.hidden) && !isBotAdmin) { chFail('Этот подарок недоступен'); break; }
         if (globalSoldOut && !isBotAdmin) { chFail('Магазин временно закрыт'); break; }
         const curStock = giftStock.get(giftId);
         if (curStock !== null && curStock !== undefined && curStock <= 0) { chFail('Подарок распродан!'); break; }

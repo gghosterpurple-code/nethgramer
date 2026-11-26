@@ -985,6 +985,35 @@ html.dark .menu-theme-toggle{background:#3390ec}html.dark .menu-theme-toggle:aft
 .gift-send-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(42,171,238,.45); }
 .gift-send-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
+/* ── Окно выбора и отправки подарка: листается, не обрезается ── */
+.gift-shop-panel { max-height: min(85vh, 85dvh); }
+.gift-shop-header { flex-shrink: 0; }
+/* без min-height:0 сетка не сжимается внутри панели — нижние карточки (и цены) обрезались без прокрутки */
+.gift-grid { min-height: 0; align-content: start; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.gift-card-price { white-space: nowrap; max-width: 100%; }
+.gift-confirm-overlay { padding: 16px; }
+.gift-confirm-modal { max-height: calc(100dvh - 32px); max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+@supports (height: 100dvh) { .gift-confirm-modal { max-height: calc(100dvh - 32px); } }
+.gift-confirm-row { font-size: 16px; }
+@media (max-width: 700px) {
+  .gift-shop-overlay { align-items: flex-end; }
+  .gift-shop-panel { width: 100%; max-width: none; border-radius: 22px 22px 0 0; max-height: 88vh; max-height: 88dvh; padding-bottom: env(safe-area-inset-bottom); }
+  .gift-grid { gap: 8px; padding: 10px; }
+  .gift-card { padding: 10px 6px 10px; border-radius: 16px; }
+  .gift-card:hover { transform: none; }
+  .gift-card-lottie { width: 64px; height: 64px; margin-bottom: 6px; }
+  .gift-card-name { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gift-card-price { font-size: 11.5px; padding: 2px 6px; }
+  .gift-confirm-overlay { align-items: flex-end; padding: 0; }
+  .gift-confirm-modal { max-width: none; border-radius: 22px 22px 0 0; max-height: 92vh; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+  @supports (height: 100dvh) { .gift-confirm-modal { max-height: 92dvh; } }
+  .gift-confirm-hero { padding: 22px 20px 16px; }
+  .gift-confirm-lottie { width: 96px; height: 96px; }
+  .gift-confirm-body { padding: 14px 18px 0; }
+  .gift-confirm-textarea { font-size: 16px; height: 64px; }
+}
+@media (max-width: 360px) { .gift-grid { grid-template-columns: repeat(2, 1fr); } }
+
 
 
 /* ── GIFT VIEW MODAL (click gift in chat) ── */
@@ -6807,12 +6836,12 @@ const GIFTS = [
   { id:'cake',         name:'Cake',         price:500,   stock:30, limited:true  },
   { id:'astral_shard', name:'Crystal Ball', price:555,   stock:150, limited:true  },
   { id:'plush_pepe',   name:'Plush Pepe',   price:2000,  stock:500,  limited:true  },
-  { id:'duck',         name:'Duck',         price:7000,  stock:null, limited:false },
+  { id:'duck',         name:'Duck',         price:7000,  stock:null, limited:false, hidden:true },
   { id:'durov_cap',    name:'Durov Cap',    price:10000, stock:null, limited:false },
-  { id:'lime',         name:'Lime',         price:1000000, stock:15,  limited:true  },
-  { id:'zombie',       name:'Zombie',       price:9999999, stock:100, limited:true  },
+  { id:'lime',         name:'Lime',         price:1000000, stock:15,  limited:true, hidden:true },
+  { id:'zombie',       name:'Zombie',       price:9999999, stock:100, limited:true, hidden:true },
   { id:'facepalm',     name:'Facepalm',     price:3000,    stock:5,   limited:true  },
-  { id:'medal',        name:'Medal',        price:7777,    stock:66,  limited:true  },
+  { id:'medal',        name:'Medal',        price:7777,    stock:66,  limited:true, hidden:true },
   { id:'peach',        name:'Peach',        price:5000,    stock:35,  limited:true  },
   { id:'rolex_watch',  name:'Watch',        price:2500,    stock:40,  limited:true  },
   { id:'signet_ring',  name:'Signet Ring',  price:10000,   stock:10,  limited:true  },
@@ -7033,8 +7062,9 @@ function renderGiftGrid() {
   const sorted = [...GIFTS].sort((a, b) => a.price - b.price);
 
   sorted.forEach((gift, i) => {
-    // Admin-only gifts: hide completely if not admin
+    // Admin-only gifts: hide completely if not admin; hidden — скрыты из магазина для всех
     if (gift.adminOnly && !isAdminAuthorized) return;
+    if (gift.hidden) return;
 
     const remaining = giftStock[gift.id];
     const soldOut = (globalSoldOut && !isAdminAuthorized) || (gift.limited && remaining !== null && remaining <= 0);
