@@ -2490,8 +2490,10 @@ button .ic{margin-top:-2px}
   --bubble-shadow:0 1px 2px rgba(16,35,47,.15);
   --r-msg:15px; --r-msg-sm:6px; --r:12px;
   --tg-ease:cubic-bezier(.2,.8,.2,1);
-  /* ширина колонки чата: 100% — сообщения прижаты к краям окна (было 728px — узкая колонка по центру) */
+  /* ширина колонки сообщений: 100% — сообщения прижаты к краям окна */
   --chat-col:100%;
+  /* поле ввода и панели над ним остаются узкой колонкой по центру */
+  --inp-col:728px;
 }
 html.dark{
   --accent:#4f9cf0; --accent2:#3d8ae0; --accent-light:rgba(79,156,240,.16);
@@ -2668,7 +2670,7 @@ html.dark .out .bubble{color:#fff}
 .typing-bub .tdot{background:var(--text2)}
 
 /* ── COMPOSER ── */
-.inp-area{background:transparent;border-top:0;padding:4px max(16px,calc((100% - var(--chat-col)) / 2)) 20px;gap:8px}
+.inp-area{background:transparent;border-top:0;padding:4px max(16px,calc((100% - var(--inp-col)) / 2)) 20px;gap:8px}
 .inp-wrap{position:relative;background:var(--surface);border-radius:var(--r-msg);border-bottom-right-radius:0;box-shadow:var(--bubble-shadow);min-height:56px;padding:0 6px}
 .inp-wrap::after{content:'';position:absolute;right:-8px;bottom:0;width:9px;height:13px;background:var(--surface);clip-path:polygon(0 0,0 100%,100% 100%,55% 78%,20% 40%)}
 .inp-wrap .icon-btn{width:44px;height:44px;margin-bottom:6px}
@@ -2678,10 +2680,10 @@ html.dark .out .bubble{color:#fff}
 .inp-area:not(.has-text) .send-btn{background:var(--surface);color:var(--text2)}
 .inp-area:not(.has-text) .send-btn svg{stroke:currentColor}
 .inp-area:not(.has-text) .send-btn:hover{background:var(--accent);color:#fff}
-.cmd-panel{background:var(--surface);border-top:0;margin:0 max(16px,calc((100% - var(--chat-col)) / 2));border-radius:var(--r);box-shadow:var(--menu-shadow)}
+.cmd-panel{background:var(--surface);border-top:0;margin:0 max(16px,calc((100% - var(--inp-col)) / 2));border-radius:var(--r);box-shadow:var(--menu-shadow)}
 .cmd-item{margin:2px 4px;border-radius:8px}
 .cmd-item:hover{background:var(--hover)}
-.ch-readonly-bar,html.dark .ch-readonly-bar{background:var(--surface);border-top:0;color:var(--accent);font-weight:500;font-size:15px;margin:4px max(16px,calc((100% - var(--chat-col)) / 2)) 20px;border-radius:var(--r-msg);box-shadow:var(--bubble-shadow)}
+.ch-readonly-bar,html.dark .ch-readonly-bar{background:var(--surface);border-top:0;color:var(--accent);font-weight:500;font-size:15px;margin:4px max(16px,calc((100% - var(--inp-col)) / 2)) 20px;border-radius:var(--r-msg);box-shadow:var(--bubble-shadow)}
 
 /* ── MODALS / PANELS (общая эстетика) ── */
 .create-backdrop,.ch-members-overlay,.ch-edit-overlay,.ch-info-overlay{background:rgba(0,0,0,.25)}
@@ -2826,13 +2828,13 @@ html.dark .ctick{color:var(--accent)}
 .hdr-status.typing{color:var(--accent)}
 
 /* Кнопка «вниз» */
-.scroll-down-btn{position:absolute;z-index:6;right:max(16px,calc((100% - var(--chat-col)) / 2 - 72px));bottom:90px;width:48px;height:48px;border-radius:50%;border:0;background:var(--surface);color:var(--icon);box-shadow:0 1px 3px rgba(16,35,47,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transform:translateY(12px) scale(.9);pointer-events:none;transition:opacity .15s,transform .15s}
+.scroll-down-btn{position:absolute;z-index:6;right:max(16px,calc((100% - var(--inp-col)) / 2 - 72px));bottom:90px;width:48px;height:48px;border-radius:50%;border:0;background:var(--surface);color:var(--icon);box-shadow:0 1px 3px rgba(16,35,47,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transform:translateY(12px) scale(.9);pointer-events:none;transition:opacity .15s,transform .15s}
 .scroll-down-btn.vis{opacity:1;transform:none;pointer-events:auto}
 .scroll-down-btn:hover{color:var(--tg-blue)}
 .sd-count{position:absolute;top:-6px;left:50%;transform:translateX(-50%);min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--tg-blue);color:#fff;font-size:13px;font-weight:500;line-height:22px;text-align:center}
 
 /* 6. Поле ввода */
-.inp-area,#chInpArea{display:flex;align-items:flex-end;gap:8px;background:transparent!important;border:0!important;padding:0 max(16px,calc((100% - var(--chat-col)) / 2)) 12px;position:relative;z-index:2}
+.inp-area,#chInpArea{display:flex;align-items:flex-end;gap:8px;background:transparent!important;border:0!important;padding:0 max(16px,calc((100% - var(--inp-col)) / 2)) 12px;position:relative;z-index:2}
 .inp-wrap,html.dark .inp-wrap{flex:1;min-width:0;display:flex;align-items:flex-end;background:var(--surface)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;opacity:1;min-height:54px;border-radius:27px!important;box-shadow:0 1px 2px rgba(16,35,47,.15);padding:0 6px}
 .inp-wrap::after{display:none!important}
 .inp-wrap .icon-btn,.inp-cmd-btn{width:44px;height:44px;margin:5px 0;flex-shrink:0;border:0;border-radius:50%;background:none;color:var(--icon);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:color .15s,background .15s}
@@ -2847,7 +2849,7 @@ html.dark .ctick{color:var(--accent)}
 .send-btn svg{width:24px;height:24px;stroke:currentColor}
 .send-btn .send-ic svg{stroke:none}
 .inp-area:not(.has-text) .send-ic,.inp-area.has-text .mic-ic{opacity:0;transform:scale(.5) rotate(-30deg);pointer-events:none}
-.cmd-panel{margin:0 max(16px,calc((100% - var(--chat-col)) / 2)) 8px}
+.cmd-panel{margin:0 max(16px,calc((100% - var(--inp-col)) / 2)) 8px}
 
 /* Мобильная версия (APK) */
 @media (max-width:700px){
@@ -2892,7 +2894,7 @@ html.dark .out .mx-react.mine{background:#fff;color:#2b5278}
 html.dark .out .fwd-hdr{color:#fff}
 .bedited{font-size:12px;margin-right:4px;opacity:.9}
 .mx-noanim .bubble{animation:none!important}
-.mx-editbar{position:absolute;bottom:calc(100% - 6px);left:max(16px,calc((100% - var(--chat-col)) / 2));right:calc(max(16px,calc((100% - var(--chat-col)) / 2)) + 62px);display:flex;align-items:center;gap:12px;padding:8px 8px 12px 14px;background:var(--surface);border-radius:16px 16px 0 0;box-shadow:0 -1px 2px rgba(16,35,47,.1)}
+.mx-editbar{position:absolute;bottom:calc(100% - 6px);left:max(16px,calc((100% - var(--inp-col)) / 2));right:calc(max(16px,calc((100% - var(--inp-col)) / 2)) + 62px);display:flex;align-items:center;gap:12px;padding:8px 8px 12px 14px;background:var(--surface);border-radius:16px 16px 0 0;box-shadow:0 -1px 2px rgba(16,35,47,.1)}
 .mx-eb-ic{display:flex;color:var(--tg-blue)}
 .mx-eb-txt{flex:1;min-width:0;display:flex;flex-direction:column;font-size:14px;line-height:1.3;border-left:2px solid var(--tg-blue);padding-left:8px}
 .mx-eb-txt b{color:var(--tg-blue);font-weight:500}
