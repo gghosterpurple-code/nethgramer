@@ -167,6 +167,10 @@ const NFT_MODELS_BY_GIFT = {
     {id:'raphael',name:'Raphael'},{id:'red_pepple',name:'Red Pepple'},{id:'sketchy',name:'Sketchy'},
     {id:'spectrum',name:'Spectrum'},
   ],
+  rolex_watch: [
+    {id:'agent_007',name:'007'},{id:'blue_daytona',name:'Blue Daytona'},{id:'memory_flash',name:'Memory Flash'},
+    {id:'patriot',name:'Patriot'},{id:'pot_of_gold',name:'Pot of Gold'},{id:'topgun',name:'Top Gun'},
+  ],
   spy_agaric: [
     {id:'bleached',name:'Bleached'},{id:'emerald',name:'Emerald'},{id:'pepe',name:'Pepe'},
     {id:'prime_night',name:'Prime Night'},{id:'rafa',name:'Rafa'},{id:'ruby',name:'Ruby'},
@@ -191,7 +195,7 @@ const NFT_GRADIENTS = [
   {name:'Toxic',      css:'linear-gradient(135deg,#56ab2f,#a8e063)'},
 ];
 
-const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard','candy_cane','spy_agaric']);
+const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard','candy_cane','spy_agaric','rolex_watch']);
 
 // ── VELO$IPE ECONOMY ──────────────────────────────────────────────
 // Игровая валюта внутри Nethgram. Не настоящая криптовалюта.
@@ -295,7 +299,7 @@ function gmBid(def, g) {
   const bid = gmSellPrice(g);
   return shopSells(def) ? Math.min(bid, Math.floor(def.price * GIFT_SELL_RATE)) : bid;
 }
-function giftBounds(def) { return [Math.max(1, def.price / 10), def.price * 50]; }
+function giftBounds(def) { return [Math.max(1, def.price / 10), def.price * 200]; } // потолок ×200 — место для огромных пампов
 function ensureGiftMarket() {
   for (const d of GIFT_DEFS_TRADABLE()) if (!giftMarket.has(d.id)) giftMarket.set(d.id, { rate:d.price, prevRate:d.price, series:newSeries(d.price), stock:0 });
 }
@@ -374,11 +378,19 @@ function pumpTarget() { // во сколько раз вырастет: чаще
   if (r < 0.9) return rnd(3, 10);
   return rnd(10, 40);
 }
+// Подарки: пампы чаще и сильнее — чаще ×2–5, часто ×5–20, иногда ×20–100
+const GIFT_PUMP = { chanceMul: 1.8 };   // пампы на подарках в 1,8 раза чаще обычного
+function giftPumpTarget() {
+  const r = Math.random();
+  if (r < 0.35) return rnd(2, 5);
+  if (r < 0.75) return rnd(5, 20);
+  return rnd(20, 100);
+}
 function startEvent(m, kind, mult, ticks) {
   m.ev = { kind, ticksLeft: ticks, perTick: Math.pow(mult, 1 / ticks), from: m.rate };
 }
-function stepRate(m, base, min, max, scale) {
-  scale = scale || 1;
+function stepRate(m, base, min, max, scale, o) {
+  scale = scale || 1; o = o || {};
   let rate = m.rate, nr, started = null, ended = null;
   if (m.ev && m.ev.ticksLeft > 0) {
     // идёт событие: двигаемся к цели с рваными свечами
@@ -398,8 +410,8 @@ function stepRate(m, base, min, max, scale) {
     startEvent(m, 'dump', m.pendingDump.mult, Math.floor(rnd(3, 14)));
     m.pendingDump = null; started = 'dump';
     nr = rate;
-  } else if (Math.random() < MKT.pumpChance * scale) {
-    startEvent(m, 'pump', pumpTarget(), Math.floor(rnd(8, 48)));   // 2–12 минут роста
+  } else if (Math.random() < MKT.pumpChance * scale * (o.pumpMul || 1)) {
+    startEvent(m, 'pump', (o.pumpTarget || pumpTarget)(), Math.floor(rnd(8, 48)));   // 2–12 минут роста
     started = 'pump'; nr = rate;
   } else if (Math.random() < MKT.crashChance * scale) {
     startEvent(m, 'crash', rnd(0.15, 0.65), Math.floor(rnd(2, 12)));  // −35…−85% за 0,5–3 минуты
@@ -465,7 +477,7 @@ function tickMarket() {
       const g = giftMarket.get(def.id); if (!g) continue;
       const [mn, mx] = giftBounds(def);
       g.prevRate = g.rate;
-      const s = stepRate(g, def.price, mn, mx, 0.7);
+      const s = stepRate(g, def.price, mn, mx, 0.7, { pumpMul:GIFT_PUMP.chanceMul, pumpTarget:giftPumpTarget });
       seriesPush(g.series, s.rate, now);
       eventNews('🎁 ' + def.name, 'gift_' + def.id, s, g.prevRate);
     }
@@ -987,9 +999,21 @@ function starsSyncMsg(uid) {
   return { type:'stars_sync', balance: starsOf(uid), lastDaily: dailyRewards.get(uid) || null };
 }
 /** Текст, притворяющийся подарком: такие карточки создаёт только сервер или оплаченная покупка */
+const BOT_CHAT_CAP = 300; // сколько последних сообщений хранить в чате с ботом
+function pushBotMsg(key, m) {
+  if (!messages.has(key)) messages.set(key, []);
+  const arr = messages.get(key);
+  arr.push(m);
+  if (arr.length > BOT_CHAT_CAP) arr.splice(0, arr.length - BOT_CHAT_CAP);
+  scheduleSave();
+}
+/** Команду входа в админку храним без пароля */
+function redactBotText(t) {
+  return typeof t === 'string' && /^\/l\s/i.test(t.trim()) ? '/l ••••••' : t;
+}
 function isForgedGiftText(t) {
   if (typeof t !== 'string' || t.charCodeAt(0) !== 123) return false;
-  try { const d = JSON.parse(t); return !!d && (d.isGift === true || d.isNftTransfer === true); } catch (e) { return false; }
+  try { const d = JSON.parse(t); return !!d && (d.isGift === true || d.isNftTransfer === true || d.isStars === true); } catch (e) { return false; }
 }
 
 /** Частную группу видят и читают только её участники */
@@ -2712,15 +2736,13 @@ server.on('upgrade', (req, socket) => {
 
         if (toId === 'bot_random') {
           const key = chatKey(userId, 'bot_random');
-          if (!messages.has(key)) messages.set(key, []);
           const userMsg = { id:messageId, from:userId, to:'bot_random', text:msg.text, time:timeNow(), ts:Date.now() };
-          messages.get(key).push(userMsg);
+          pushBotMsg(key, userMsg);
           send({ type:'message', chatWith:'bot_random', message:userMsg });
           const result = handleRandomizerBot(msg.text, userId, null);
           if (result.text) {
             const reply = botReply('bot_random', result.text);
-            messages.get(key).push(reply);
-            scheduleSave();
+            pushBotMsg(key, reply);
             send({ type:'message', chatWith:'bot_random', message:reply });
           }
           break;
@@ -2728,11 +2750,10 @@ server.on('upgrade', (req, socket) => {
 
         if (toId === 'bot_simpson') {
           const key = chatKey(userId, 'bot_simpson');
-          if (!messages.has(key)) messages.set(key, []);
-          messages.get(key).push(newMsg);
+          pushBotMsg(key, newMsg);
           setTimeout(() => {
             const reply = botReply('bot_simpson', handleSimpson(msg.text));
-            messages.get(key).push(reply);
+            pushBotMsg(key, reply);
             send({ type:'message', chatWith:'bot_simpson', message:reply });
           }, 900);
           break;
@@ -2740,20 +2761,19 @@ server.on('upgrade', (req, socket) => {
 
         if (toId === 'bot_nethgram') {
           const key = chatKey(userId, 'bot_nethgram');
-          if (!messages.has(key)) messages.set(key, []);
-          messages.get(key).push(newMsg);
+          pushBotMsg(key, { ...newMsg, text: redactBotText(newMsg.text) });
           setTimeout(() => {
             const result = handleNethgramBot(msg.text, userId, userAdminBotAuthorized);
             if (result.admin) { userAdminBotAuthorized = true; }
             if (result.welcome) {
               const replyText = result.text.replace('{NAME}', senderUser?.name || '');
               const reply = botReply('bot_nethgram', replyText);
-              messages.get(key).push(reply);
+              pushBotMsg(key, reply);
               send({ type:'message', chatWith:'bot_nethgram', message:reply });
               return;
             }
             const reply = botReply('bot_nethgram', result.text);
-            messages.get(key).push(reply);
+            pushBotMsg(key, reply);
             send({ type:'message', chatWith:'bot_nethgram', message:reply });
 
             if (result.unlimStars) {
@@ -2960,6 +2980,33 @@ server.on('upgrade', (req, socket) => {
           safeSend(recipient.ws, { type:'new_message_notify', fromId:userId, fromName:senderUser?.name, text:msg.text });
         }
         if (toId !== userId) pushNotify(toId, pushItemFor(toId, userId, newMsg));
+        break;
+      }
+
+      // Перевести свои звёзды другому пользователю
+      case 'send_stars': {
+        if (!userId) break;
+        const toId = String(msg.toId || ''), amount = toInt(msg.amount);
+        const fail = text => send({ type:'stars_send_failed', text, balance: starsOf(userId) });
+        const sender = users.get(userId), rcpt = users.get(toId);
+        if (!amount) { fail('Введите количество звёзд'); break; }
+        if (!rcpt || toId === userId || toId.startsWith('bot_')) { fail('Получатель не найден'); break; }
+        if (!trySpendStars(userId, amount)) { fail('Недостаточно звёзд'); break; }
+        addStarsTo(toId, amount);
+        const text = JSON.stringify({ isStars:true, amount, fromName: sender ? sender.name : '', toName: rcpt.name || '' });
+        const sm = { id:genId(), from:userId, text, time:timeNow(), ts:Date.now() };
+        const skey = chatKey(userId, toId);
+        if (!messages.has(skey)) messages.set(skey, []);
+        messages.get(skey).push(sm);
+        scheduleSave();
+        console.log('⭐ Перевод: ' + (sender && sender.name) + ' → ' + rcpt.name + ': ' + amount);
+        send({ type:'stars_sent', toId, toName: rcpt.name, amount, message: sm, balance: starsOf(userId) });
+        if (isSocketOpen(rcpt.ws)) {
+          safeSend(rcpt.ws, { type:'message', chatWith:userId, message: { ...sm, fromName: sender && sender.name } });
+          safeSend(rcpt.ws, { type:'stars_received', fromId:userId, fromName: sender ? sender.name : '', amount, balance: starsOf(toId) });
+          safeSend(rcpt.ws, { type:'new_message_notify', fromId:userId, fromName: sender && sender.name, text:'⭐ ' + amount.toLocaleString('ru-RU') + ' звёзд' });
+        }
+        pushNotify(toId, { ...pushItemFor(toId, userId, sm), text:'⭐ Вам перевели ' + amount.toLocaleString('ru-RU') + ' звёзд' });
         break;
       }
 

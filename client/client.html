@@ -985,11 +985,44 @@ html.dark .menu-theme-toggle{background:#3390ec}html.dark .menu-theme-toggle:aft
 .gift-send-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(42,171,238,.45); }
 .gift-send-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
+/* ── Перевод звёзд ── */
+.stars-hdr-btn img { width: 22px; height: 22px; object-fit: contain; }
+.sh-amount.minus { color: #e74c3c; }
+.msg-row.stars-row { margin: 8px 0; }
+.stars-bubble { position: relative; min-width: 190px; max-width: 260px; padding: 14px 16px 10px; border-radius: 18px; text-align: center;
+  background: linear-gradient(150deg,#fff6d6,#ffe08a); color: #6b3d00; box-shadow: var(--bubble-shadow, 0 1px 2px rgba(0,0,0,.15)); }
+html.dark .stars-bubble { background: linear-gradient(150deg,#3b2f0c,#6b4d08); color: #ffe7a3; }
+.stb-ico img { width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 3px 8px rgba(255,170,0,.45)); }
+.stb-amt { font-size: 22px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stb-sub { font-size: 13px; opacity: .85; margin-top: 2px; word-break: break-word; }
+.stb-time { font-size: 11px; opacity: .6; margin-top: 6px; text-align: right; }
+.stars-send-overlay { display: none; position: fixed; inset: 0; z-index: 905; align-items: center; justify-content: center; background: rgba(0,0,0,.5); padding: 16px; }
+.stars-send-overlay.open { display: flex; }
+.stars-send-modal { position: relative; background: var(--surface); color: var(--text); border-radius: 24px; width: 100%; max-width: 360px; padding: 26px 22px 22px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25); animation: cardIn .3s cubic-bezier(.16,1,.3,1) both; max-height: calc(100vh - 32px); overflow-y: auto; }
+html.dark .stars-send-modal { background: #0b0b0b; }
+.ss-hero { text-align: center; }
+.ss-hero img { width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(255,170,0,.5)); }
+.ss-title { text-align: center; font-size: 19px; font-weight: 700; margin-top: 6px; }
+.ss-sub { text-align: center; font-size: 13px; color: var(--text2); margin: 4px 0 16px; word-break: break-word; }
+.ss-input { display: flex; align-items: center; gap: 8px; background: var(--bg2); border: 1.5px solid var(--border); border-radius: 14px; padding: 10px 14px; }
+.ss-input:focus-within { border-color: var(--accent); }
+.ss-input input { flex: 1; min-width: 0; border: none; background: transparent; outline: none; font: inherit; font-size: 24px; font-weight: 800; color: var(--text); }
+.ss-input span { font-size: 20px; }
+.ss-quick { display: flex; gap: 6px; margin: 10px 0 4px; }
+.ss-quick button { flex: 1; padding: 9px 0; border-radius: 11px; border: 1px solid var(--border); background: var(--bg2); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+.ss-err { min-height: 18px; font-size: 12.5px; color: #e74c3c; text-align: center; margin: 4px 0; }
+@media (max-width: 700px) {
+  .stars-send-overlay { align-items: flex-end; padding: 0; }
+  .stars-send-modal { max-width: none; border-radius: 22px 22px 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+}
+
 /* ── Окно выбора и отправки подарка: листается, не обрезается ── */
 .gift-shop-panel { max-height: min(85vh, 85dvh); }
 .gift-shop-header { flex-shrink: 0; }
 /* без min-height:0 сетка не сжимается внутри панели — нижние карточки (и цены) обрезались без прокрутки */
-.gift-grid { min-height: 0; align-content: start; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* строки по высоте карточки: у карточек overflow:hidden, и без этого сетка сжимала их под высоту окна (обрезались названия и цены) */
+.gift-grid { min-height: 0; align-content: start; grid-auto-rows: max-content; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .gift-card-price { white-space: nowrap; max-width: 100%; }
 .gift-confirm-overlay { padding: 16px; }
 .gift-confirm-modal { max-height: calc(100dvh - 32px); max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
@@ -1012,7 +1045,7 @@ html.dark .menu-theme-toggle{background:#3390ec}html.dark .menu-theme-toggle:aft
   .gift-confirm-body { padding: 14px 18px 0; }
   .gift-confirm-textarea { font-size: 16px; height: 64px; }
 }
-@media (max-width: 360px) { .gift-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 330px) { .gift-grid { grid-template-columns: repeat(2, 1fr); } }
 
 
 
@@ -3743,7 +3776,7 @@ function sanitizeIncoming(v, key, parent) {
     if (v.charCodeAt(0) === 123) {
       try {
         const d = JSON.parse(v);
-        if (d && (d.isGift || d.isPhoto || d.isSticker || d.isNftTransfer)) return JSON.stringify(sanitizeIncoming(d));
+        if (d && (d.isGift || d.isPhoto || d.isSticker || d.isNftTransfer || d.isStars)) return JSON.stringify(sanitizeIncoming(d));
       } catch (e) {}
     }
     return v;
@@ -3973,6 +4006,8 @@ function handleWS(msg) {
     }
 
     case 'my_chats': {
+      // Переписка с ботами хранится на сервере — подтягиваем её один раз за подключение
+      if (!window.__botHistAsked) { window.__botHistAsked = true; BOTS.forEach(b => wsSend({ type:'get_history', withId:b.id })); }
       // Legacy private chats payload
       (msg.chats || []).forEach(chat => {
         if (!contacts.has(chat.withId) && chat.withUser) addOrUpdateContact(chat.withUser);
@@ -4325,6 +4360,11 @@ function handleWS(msg) {
         const srvIds = new Set((msg.messages || []).map(m => m.id));
         const localOnly = hc.messages.filter(m => !srvIds.has(m.id));
         hc.messages = [...(msg.messages || []), ...localOnly].sort((a, b) => (a.ts||0) - (b.ts||0));
+        if ((hc.type === 'bot' || hc.type === 'devbot') && hc.messages.length) {
+          const lm = hc.messages[hc.messages.length - 1];
+          hc.lastMsg = previewCut(chatPreviewText(lm.text)); hc.time = lm.time || hc.time; hc.updatedAt = lm.ts || hc.updatedAt;
+          if (typeof renderChats === 'function') renderChats();
+        }
         if (activeId === msg.withId) {
           renderMessages(hc);
           hc.unread = 0;
@@ -4776,6 +4816,38 @@ function handleWS(msg) {
       break;
     }
 
+    case 'stars_sent': {
+      if (typeof msg.balance === 'number') { starBalance = msg.balance; isStarsUnlimited = msg.balance >= 999_999_999; }
+      starsHistory.unshift({ type:'send', amount: msg.amount, label:'Перевод → ' + safeText(msg.toName || 'пользователь'), date: starsHistNow() });
+      updateStarsUI();
+      closeSendStars();
+      const sc = contacts.get(msg.toId);
+      if (sc && msg.message) {
+        if (!sc.messages) sc.messages = [];
+        if (!sc.messages.some(m => m.id === msg.message.id)) sc.messages.push(msg.message);
+        sc.lastMsg = previewCut(chatPreviewText(msg.message.text)); sc.time = msg.message.time; sc.updatedAt = msg.message.ts;
+        const area = document.getElementById('msgsArea');
+        if (area && activeId === msg.toId) { appendMsg(area, msg.message, sc, sc.messages.length - 1); area.scrollTop = area.scrollHeight; }
+        renderChats();
+      }
+      showToast('Звёзды отправлены', `⭐ ${Number(msg.amount).toLocaleString('ru-RU')} → ${msg.toName || ''}`, 'logo', '#34c759');
+      break;
+    }
+    case 'stars_send_failed': {
+      if (typeof msg.balance === 'number') { starBalance = msg.balance; isStarsUnlimited = msg.balance >= 999_999_999; updateStarsUI(); }
+      const e = document.getElementById('ssErr'), b = document.getElementById('ssGo');
+      if (e && starsSendTo) { e.textContent = msg.text || 'Не удалось отправить'; if (b) { b.disabled = false; b.textContent = 'Отправить'; } }
+      else showToast('Звёзды', msg.text || 'Не удалось отправить', '⚠️', '#e74c3c');
+      break;
+    }
+    case 'stars_received': {
+      if (typeof msg.balance === 'number') { starBalance = msg.balance; isStarsUnlimited = msg.balance >= 999_999_999; }
+      starsHistory.unshift({ type:'unlim', amount: msg.amount, label:'Перевод от ' + safeText(msg.fromName || 'пользователя'), date: starsHistNow() });
+      updateStarsUI();
+      showToast('Вам перевели звёзды', `⭐ +${Number(msg.amount).toLocaleString('ru-RU')} от ${msg.fromName || 'пользователя'}`, 'logo', '#34c759');
+      break;
+    }
+
     case 'stars_gifted': {
       starBalance = msg.balance;
       starsHistory.unshift({ type: 'unlim', amount: msg.amount, label: 'Подарок от ' + (msg.fromName || 'Nethgram'), date: new Date().toLocaleDateString('ru-RU') });
@@ -5139,6 +5211,7 @@ function chatPreviewText(text) {
   try {
     const d = JSON.parse(text);
     if (d && d.isNftTransfer) return '🎁 ' + (d.giftName || 'NFT') + (d.nftNumber ? ' #' + d.nftNumber : '');
+    if (d && d.isStars) return '⭐ ' + Number(d.amount || 0).toLocaleString('ru-RU') + ' звёзд';
     if (d && d.isGift) return '🎁 ' + (d.giftName || 'Подарок');
     if (d && d.isPhoto) return '📷 Фото' + (d.caption ? ': ' + d.caption : '');
     if (d && d.isSticker) return '🎭 Стикер';
@@ -5440,6 +5513,7 @@ function openChat(id) {
       </div>
       <div class="hdr-btns">
         <button class="icon-btn" title="Поиск по сообщениям"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+        ${!isBot ? '<button class="icon-btn stars-hdr-btn" title="Отправить звёзды" onclick="openSendStars()"><img src="' + STAR_IMG + '" alt="⭐"></button>' : ''}
         ${!isBot ? '<button class="icon-btn gift-hdr-btn" title="Отправить подарок" id="hdrGiftBtn" onclick="openHeaderGift()"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></button>' : ''}
         <button class="icon-btn" title="Ещё" onclick="openContactProfile(activeId)">${svgIc('more',24)}</button>
       </div>
@@ -5471,6 +5545,7 @@ function openChat(id) {
 
   // Load messages
   if (isBot) {
+    wsSend({ type: 'get_history', withId: id }); // переписка с ботом сохраняется на сервере
     renderMessages(c);
   } else {
     wsSend({ type: 'get_history', withId: id });
@@ -6783,8 +6858,8 @@ function renderStarsHistory() {
         <div class="sh-name">${item.label}</div>
         <div class="sh-date">${item.date}</div>
       </div>
-      <div class="sh-amount">
-        +${item.amount.toLocaleString()}
+      <div class="sh-amount${item.type === 'send' || item.type === 'gift_send' ? ' minus' : ''}">
+        ${item.type === 'send' || item.type === 'gift_send' ? '−' : '+'}${item.amount.toLocaleString()}
         <img src="${STAR_IMG}" alt="⭐">
       </div>
     </div>
@@ -6831,16 +6906,16 @@ const GIFTS = [
   { id:'candy_cane',   name:'Candy Cane',   price:15,    stock:50, limited:true  },
   { id:'test_gift_1',  name:'Test Gift 1',  price:10,    stock:5,    limited:true,  adminOnly:true },
   { id:'test_gift_2',  name:'Test Gift 2',  price:15,    stock:10,   limited:true,  adminOnly:true },
-  { id:'wine',         name:'Wine',         price:50,    stock:450,  limited:true  },
+  { id:'wine',         name:'Wine',         price:50,    stock:45,  limited:true  },
   { id:'lollipop',     name:'Lollipop',     price:75,    stock:100, limited:true  },
-  { id:'scared_cat',   name:'Scared Cat',   price:100,   stock:500,  limited:true  },
-  { id:'heart',        name:'Heart',        price:175,   stock:null, limited:false },
-  { id:'spy_agaric',   name:'Spy Agaric',   price:200,   stock:100, limited:true  },
+  { id:'scared_cat',   name:'Scared Cat',   price:100,   stock:50,  limited:true  },
+  { id:'heart',        name:'Heart',        price:175,   stock:45, limited:true },
+  { id:'spy_agaric',   name:'Spy Agaric',   price:200,   stock:10, limited:true  },
   { id:'cake',         name:'Cake',         price:500,   stock:30, limited:true  },
-  { id:'astral_shard', name:'Crystal Ball', price:555,   stock:150, limited:true  },
-  { id:'plush_pepe',   name:'Plush Pepe',   price:2000,  stock:500,  limited:true  },
-  { id:'duck',         name:'Duck',         price:7000,  stock:null, limited:false, hidden:true },
-  { id:'durov_cap',    name:'Durov Cap',    price:10000, stock:null, limited:false },
+  { id:'astral_shard', name:'Crystal Ball', price:555,   stock:15, limited:true  },
+  { id:'plush_pepe',   name:'Plush Pepe',   price:2000,  stock:50,  limited:true  },
+  { id:'duck',         name:'Duck',         price:7000,  stock:50, limited:true, hidden:true },
+  { id:'durov_cap',    name:'Durov Cap',    price:10000, stock:100, limited:true },
   { id:'lime',         name:'Lime',         price:1000000, stock:15,  limited:true, hidden:true },
   { id:'zombie',       name:'Zombie',       price:9999999, stock:100, limited:true, hidden:true },
   { id:'facepalm',     name:'Facepalm',     price:3000,    stock:5,   limited:true  },
@@ -7440,7 +7515,7 @@ let giftViewAnim = null;
 
 // ── NFT SYSTEM ──
 // Which gifts can be upgraded to NFT
-const NFT_UPGRADEABLE = new Set(['scared_cat', 'wine', 'plush_pepe', 'astral_shard', 'candy_cane', 'spy_agaric']);
+const NFT_UPGRADEABLE = new Set(['scared_cat', 'wine', 'plush_pepe', 'astral_shard', 'candy_cane', 'spy_agaric', 'rolex_watch']);
 
 let giftViewCurrentGift = null; // the gift entry currently shown in view modal
 
@@ -8394,9 +8469,62 @@ function renderProfileGifts(userId, container) {
   container.appendChild(grid);
 }
 
+// ── Перевод звёзд: карточка в чате ──
+function starsTransferData(text) {
+  if (typeof text !== 'string' || text.charCodeAt(0) !== 123) return null;
+  try { const d = JSON.parse(text); return d && d.isStars === true ? d : null; } catch (e) { return null; }
+}
+function renderStarsTransferBubble(msg) {
+  const d = starsTransferData(msg.text); if (!d) return null;
+  const isOut = msg.from === myUser?.id || msg.from === 'me';
+  const row = document.createElement('div');
+  row.className = 'msg-row stars-row ' + (isOut ? 'out' : 'in');
+  if (msg.id) row.dataset.mid = msg.id;
+  const amt = Number(d.amount || 0).toLocaleString('ru-RU');
+  row.innerHTML = `<div class="stars-bubble"><div class="stb-ico"><img src="${STAR_IMG}" alt="⭐"></div>
+    <div class="stb-amt">${isOut ? '−' : '+'}${amt}</div>
+    <div class="stb-sub">${isOut ? 'Вы перевели звёзды' + (d.toName ? ' — ' + safeText(d.toName) : '') : 'Перевод звёзд' + (d.fromName ? ' от ' + safeText(d.fromName) : '')}</div>
+    <div class="stb-time">${safeText(msg.time || '')}</div></div>`;
+  return row;
+}
+
+// ── Окно «Отправить звёзды» ──
+let starsSendTo = null;
+function openSendStars() {
+  const c = contacts.get(activeId);
+  if (!c || c.type !== 'user') return;
+  starsSendTo = c.id;
+  document.getElementById('ssTo').textContent = c.name || 'Пользователь';
+  document.getElementById('ssBal').textContent = isStarsUnlimited ? '∞' : Number(starBalance || 0).toLocaleString('ru-RU');
+  const inp = document.getElementById('ssAmt'); inp.value = '';
+  document.getElementById('ssErr').textContent = '';
+  const btn = document.getElementById('ssGo'); btn.disabled = false; btn.textContent = 'Отправить';
+  document.getElementById('starsSendOverlay').classList.add('open');
+  setTimeout(() => inp.focus(), 60);
+}
+function closeSendStars() { starsSendTo = null; document.getElementById('starsSendOverlay').classList.remove('open'); }
+function ssQuick(n) { const inp = document.getElementById('ssAmt'); inp.value = n === 'max' ? Math.max(0, Math.floor(starBalance || 0)) : n; ssInput(); }
+function ssInput() {
+  const inp = document.getElementById('ssAmt'); inp.value = inp.value.replace(/[^\d]/g, '').slice(0, 10);
+  const n = parseInt(inp.value || '0', 10), err = document.getElementById('ssErr');
+  err.textContent = (!isStarsUnlimited && n > starBalance) ? 'Недостаточно звёзд' : '';
+}
+function ssSubmit() {
+  const n = parseInt(document.getElementById('ssAmt').value || '0', 10), err = document.getElementById('ssErr');
+  if (!starsSendTo) return;
+  if (!n || n < 1) { err.textContent = 'Введите количество звёзд'; return; }
+  if (!isStarsUnlimited && n > starBalance) { err.textContent = 'Недостаточно звёзд'; return; }
+  const btn = document.getElementById('ssGo'); btn.disabled = true; btn.textContent = 'Отправляем…';
+  wsSend({ type:'send_stars', toId: starsSendTo, amount: n });
+  setTimeout(() => { if (btn.disabled && starsSendTo) { btn.disabled = false; btn.textContent = 'Отправить'; } }, 6000);
+}
+function starsHistNow() { const d = new Date(); return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }); }
+
 // Override appendMsg to handle gift bubbles
 const _origAppendMsg = appendMsg;
 window.appendMsg = function(area, msg, c, i) {
+  const starsRow = renderStarsTransferBubble(msg);
+  if (starsRow) { area.appendChild(starsRow); return; }
   if (isNftTransferMessage(msg.text)) {
     const isOut2 = msg.from === myUser?.id || msg.from === 'me';
     const row2 = renderNftTransferBubble(msg, isOut2, c);
@@ -9931,6 +10059,20 @@ function closeContactProfile() {
       </div>
     </div>
     <div class="gift-grid" id="giftGrid"></div>
+  </div>
+</div>
+
+<!-- ══ ОТПРАВИТЬ ЗВЁЗДЫ ══ -->
+<div class="stars-send-overlay" id="starsSendOverlay" onclick="if(event.target===this)closeSendStars()">
+  <div class="stars-send-modal">
+    <button class="gift-confirm-close" onclick="closeSendStars()" aria-label="Закрыть"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="ss-hero"><img src="https://nztcdn.com/files/6514f1e6-dab4-4d49-806a-3ff22d7793e5.webp" alt="⭐"></div>
+    <div class="ss-title">Отправить звёзды</div>
+    <div class="ss-sub">Кому: <b id="ssTo"></b> · у вас <b id="ssBal">0</b> ⭐</div>
+    <div class="ss-input"><input id="ssAmt" type="text" inputmode="numeric" placeholder="0" autocomplete="off" oninput="ssInput()" onkeydown="if(event.key==='Enter')ssSubmit()"><span>⭐</span></div>
+    <div class="ss-quick"><button onclick="ssQuick(10)">10</button><button onclick="ssQuick(50)">50</button><button onclick="ssQuick(100)">100</button><button onclick="ssQuick(500)">500</button><button onclick="ssQuick('max')">Все</button></div>
+    <div class="ss-err" id="ssErr"></div>
+    <button class="gift-send-btn" id="ssGo" onclick="ssSubmit()">Отправить</button>
   </div>
 </div>
 
