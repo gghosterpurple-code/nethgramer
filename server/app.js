@@ -170,6 +170,12 @@ const NFT_MODELS_BY_GIFT = {
   rolex_watch: [
     {id:'agent_007',name:'007'},{id:'blue_daytona',name:'Blue Daytona'},{id:'memory_flash',name:'Memory Flash'},
     {id:'patriot',name:'Patriot'},{id:'pot_of_gold',name:'Pot of Gold'},{id:'topgun',name:'Top Gun'},
+    {id:'delorean',name:'DeLorean'},{id:'the_original',name:'The Original'},
+  ],
+  cigarette: [
+    {id:'pickle_rick',name:'Pickle Rick'},{id:'black_plume',name:'Black Plume'},{id:'el_classico',name:'El Classico'},
+    {id:'far_out',name:'Far Out'},{id:'jazz_cigarette',name:'Jazz Cigarette'},{id:'psychonaut',name:'Psychonaut'},
+    {id:'red_devil',name:'Red Devil'},{id:'spectral_smoke',name:'Spectral Smoke'},
   ],
   spy_agaric: [
     {id:'bleached',name:'Bleached'},{id:'emerald',name:'Emerald'},{id:'pepe',name:'Pepe'},
@@ -195,7 +201,7 @@ const NFT_GRADIENTS = [
   {name:'Toxic',      css:'linear-gradient(135deg,#56ab2f,#a8e063)'},
 ];
 
-const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard','candy_cane','spy_agaric','rolex_watch']);
+const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard','candy_cane','spy_agaric','rolex_watch','cigarette']);
 
 // ── VELO$IPE ECONOMY ──────────────────────────────────────────────
 // Игровая валюта внутри Nethgram. Не настоящая криптовалюта.
@@ -1156,7 +1162,7 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
       console.log('\x1b[33m' + logLine + '\x1b[0m');
       if (aLogsActive) process.stdout.write(logLine + '\n');
       return {
-        text: '✅ Авторизация успешна! Вы вошли как администратор.\n\nДоступные команды:\n/mail [текст] — разослать всем\n/unlim [кол] — накрутить звёзды\n/unlimited — бесконечные звёзды\n/sub @канал [кол] — накрутить подписчиков\n/autosend [подарок] [кол] — отправить себе подарки\n/memb @чат [кол] [имя] — добавить участников\n/addus [юзернейм] [цена] — добавить коллекционный юзернейм\n/sold true/false — режим sold out\n/setphone [номер] — изменить свой номер\n/gives [кол-во] [пользователь] — подарить звёзды\n/sets [кол-во] — установить свой баланс\n/logs — список пользователей\n/alogs — список админов\n/support — контакт поддержки',
+        text: '✅ Авторизация успешна! Вы вошли как администратор.\n\nДоступные команды:\n/mail [текст] — разослать всем\n/unlim [кол] — накрутить звёзды\n/unlimited — бесконечные звёзды\n/sub @канал [кол] — накрутить подписчиков\n/autosend [подарок] [кол] — отправить себе подарки\n/memb @чат [кол] [имя] — добавить участников\n/addus [юзернейм] [цена] — добавить коллекционный юзернейм\n/restock [подарок] [кол] — вернуть подарки в магазин\n/sold true/false — режим sold out\n/setphone [номер] — изменить свой номер\n/gives [кол-во] [пользователь] — подарить звёзды\n/sets [кол-во] — установить свой баланс\n/logs — список пользователей\n/alogs — список админов\n/support — контакт поддержки',
         admin: true
       };
     }
@@ -1316,6 +1322,39 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     if (!tu) { for (const u of users.values()) { if ((u.name || '').toLowerCase() === target.toLowerCase()) { tu = u; break; } } }
     if (!tu) return { text: '❌ Пользователь "' + target + '" не найден.' };
     return { text: '⭐ Отправлено ' + amt.toLocaleString('ru-RU') + ' звёзд пользователю ' + (tu.name || tu.id) + (tu.username ? ' (@' + tu.username + ')' : '') + '.', giveStars: { toId: tu.id, amount: amt } };
+  }
+
+  // /restock [подарок] [кол] — вернуть лимитированный подарок в магазин (добавить к остатку)
+  if (t === '/restock' || t.startsWith('/restock ')) {
+    if (!isAdmin) return { text: '🔒 Команда доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
+    const parts = t.substring(8).trim().split(/\s+/).filter(Boolean);
+    const limitedList = () => GIFT_DEFS.filter(d => d.limited && !d.adminOnly)
+      .map(d => '• ' + d.name + ' (' + d.id + ') — ' + (giftStock.get(d.id) || 0) + ' шт.').join('\n');
+    if (parts.length < 2) return { text: '⚠️ Использование: /restock [подарок] [кол]\n\nПример: /restock signet_ring 10\n\nЛимитированные подарки:\n' + limitedList() };
+    const amount = toInt(parts[parts.length - 1]);
+    if (!amount || amount > 100000) return { text: '⚠️ Укажите количество от 1 до 100 000.' };
+    const q = parts.slice(0, -1).join(' ').toLowerCase();
+    const qn = q.replace(/[\s_-]+/g, '');
+    const norm = x => String(x).toLowerCase().replace(/[\s_-]+/g, '');
+    const def = GIFT_DEFS.find(d => d.id === q || norm(d.name) === qn || norm(d.id) === qn)
+             || GIFT_DEFS.find(d => norm(d.name).includes(qn) || norm(d.id).includes(qn));
+    if (!def) return { text: '⚠️ Подарок "' + q + '" не найден.\n\nЛимитированные подарки:\n' + limitedList() };
+    if (!def.limited) return { text: '⚠️ ' + def.name + ' — не лимитированный подарок, он и так всегда есть в магазине.' };
+    const used = countUsedGifts().get(def.id) || 0;
+    const newStock = (giftStock.get(def.id) || 0) + amount;
+    // довыпуск сохраняем, чтобы после перезапуска сервера остаток не урезался
+    giftRestock.extra[def.id] = Math.max(0, used + newStock - def.stock);
+    giftStock.set(def.id, newStock);
+    // если подарок был во временном ежемесячном возвращении — теперь он в магазине бессрочно
+    const a = giftRestock.active;
+    if (a && Array.isArray(a.ids) && a.ids.includes(def.id)) a.ids = a.ids.filter(id => id !== def.id);
+    scheduleSave();
+    broadcastAll(null, { type:'gift_stock', stock:{ [def.id]: newStock } });
+    console.log('🎁 /restock: ' + def.name + ' +' + amount + ' → ' + newStock);
+    const notes = [];
+    if (def.hidden) notes.push('⚠️ Подарок скрыт (hidden) — в магазине его не видно.');
+    if (globalSoldOut) notes.push('⚠️ Включён режим sold out (/sold) — магазин закрыт.');
+    return { text: '✅ ' + def.name + ' возвращён в магазин: +' + amount.toLocaleString('ru-RU') + ' шт., теперь в наличии ' + newStock.toLocaleString('ru-RU') + ' шт.' + (notes.length ? '\n\n' + notes.join('\n') : '') };
   }
 
   // /limvlp — сбросить общий дневной лимит покупки $VLP
