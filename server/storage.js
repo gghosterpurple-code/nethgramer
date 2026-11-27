@@ -28,8 +28,9 @@ const usesDb = !!DATABASE_URL;
 
 const ARRAY_COLLS = ['users', 'channels'];                       // data[coll] = [ {id, ...} ]
 const MAP_COLLS = ['messages', 'giftStock', 'userGifts', 'nftCounters', 'fakeMembers',
-                   'userStars', 'premiumUsernames', 'channelGifts', 'giveaways', 'dailyRewards'];  // data[coll] = { key: value }
-const META_KEYS = ['globalSoldOut', 'velosipe', 'premiumUsers'];  // одиночные значения
+                   'userStars', 'premiumUsernames', 'channelGifts', 'giveaways', 'dailyRewards',
+                   'giftBuysToday'];  // data[coll] = { key: value }
+const META_KEYS = ['globalSoldOut', 'velosipe', 'premiumUsers', 'giftRestock'];  // одиночные значения
 
 const md5 = s => crypto.createHash('md5').update(s).digest('hex');
 const rk = (c, k) => c + '\u0000' + k;
