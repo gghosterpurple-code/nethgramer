@@ -7066,6 +7066,9 @@ const GIFTS = [
   { id:'rolex_watch',  name:'Watch',        price:2500,    stock:40,  limited:true  },
   { id:'signet_ring',  name:'Signet Ring',  price:10000,   stock:10,  limited:true  },
   { id:'cigarette',    name:'Cigarette',    price:1500,    stock:25,  limited:true  },
+  { id:'light_sword',  name:'Light Sword',  price:1000,    stock:50,  limited:true  },
+  { id:'frog',         name:'Frog',         price:750,     stock:30,  limited:true  },
+  { id:'hat',          name:'Hat',          price:5000,    stock:75,  limited:true  },
   { id:'test_nft',     name:'Test NFT',     price:1500,  stock:50,   limited:true,  adminOnly:true },
   { id:'test_nft_1',   name:'Test NFT 1',   price:7777,  stock:5,    limited:true,  adminOnly:true },
   { id:'Shard_test',   name:'Shard test',   price:999,   stock:25,   limited:true,  adminOnly:true },
@@ -7130,7 +7133,7 @@ const giftCardObserver = new IntersectionObserver((entries) => {
 const GIFT_FALLBACK_EMOJI = {
   candy_cane:'🍬', wine:'🍷', lollipop:'🍭', scared_cat:'🐈', heart:'❤', spy_agaric:'🍄',
   cake:'🍰', astral_shard:'🔮', plush_pepe:'🐸', duck:'🦆', durov_cap:'🧢', lime:'🍋',
-  zombie:'🧟', facepalm:'🤦', medal:'🏅', peach:'🍑', rolex_watch:'⌚', signet_ring:'💍', cigarette:'🚬', test_gift_1:'🎁', test_gift_2:'🎁', test_nft:'✨',
+  zombie:'🧟', facepalm:'🤦', medal:'🏅', peach:'🍑', rolex_watch:'⌚', signet_ring:'💍', cigarette:'🚬', light_sword:'⚔️', frog:'🐸', hat:'🎩', test_gift_1:'🎁', test_gift_2:'🎁', test_nft:'✨',
   test_nft_1:'✨', Shard_test:'💎', Test_flower:'🌸'
 };
 
@@ -7656,7 +7659,7 @@ let giftViewAnim = null;
 
 // ── NFT SYSTEM ──
 // Which gifts can be upgraded to NFT
-const NFT_UPGRADEABLE = new Set(['scared_cat', 'wine', 'plush_pepe', 'astral_shard', 'candy_cane', 'spy_agaric', 'rolex_watch', 'cigarette']);
+const NFT_UPGRADEABLE = new Set(['scared_cat', 'wine', 'plush_pepe', 'astral_shard', 'candy_cane', 'spy_agaric', 'rolex_watch', 'cigarette', 'duck']);
 
 let giftViewCurrentGift = null; // the gift entry currently shown in view modal
 

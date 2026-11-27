@@ -120,6 +120,9 @@ const GIFT_DEFS = [
   { id:'rolex_watch', name:'Watch',       price:2500,    stock:40,  limited:true  },
   { id:'signet_ring', name:'Signet Ring', price:10000,   stock:10,  limited:true  },
   { id:'cigarette',   name:'Cigarette',   price:1500,    stock:25,  limited:true  },
+  { id:'light_sword', name:'Light Sword', price:1000,    stock:50,  limited:true  },
+  { id:'frog',        name:'Frog',        price:750,     stock:30,  limited:true  },
+  { id:'hat',         name:'Hat',         price:5000,    stock:75,  limited:true  },
   { id:'test_gift_1', name:'Test Gift 1', price:10,    stock:5,     limited:true,  adminOnly:true },
   { id:'test_gift_2', name:'Test Gift 2', price:15,    stock:10,    limited:true,  adminOnly:true },
   { id:'test_nft',    name:'Test NFT',    price:1500,  stock:50,    limited:true,  adminOnly:true },
@@ -177,6 +180,10 @@ const NFT_MODELS_BY_GIFT = {
     {id:'far_out',name:'Far Out'},{id:'jazz_cigarette',name:'Jazz Cigarette'},{id:'psychonaut',name:'Psychonaut'},
     {id:'red_devil',name:'Red Devil'},{id:'spectral_smoke',name:'Spectral Smoke'},
   ],
+  duck: [
+    {id:'dark_duck',name:'Dark Duck'},{id:'ducky',name:'Ducky'},{id:'feduck',name:'Feduck'},
+    {id:'lovely_duck',name:'Lovely Duck'},{id:'pepe_duck',name:'Pepe Duck'},
+  ],
   spy_agaric: [
     {id:'bleached',name:'Bleached'},{id:'emerald',name:'Emerald'},{id:'pepe',name:'Pepe'},
     {id:'prime_night',name:'Prime Night'},{id:'rafa',name:'Rafa'},{id:'ruby',name:'Ruby'},
@@ -201,7 +208,7 @@ const NFT_GRADIENTS = [
   {name:'Toxic',      css:'linear-gradient(135deg,#56ab2f,#a8e063)'},
 ];
 
-const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard','candy_cane','spy_agaric','rolex_watch','cigarette']);
+const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard','candy_cane','spy_agaric','rolex_watch','cigarette','duck']);
 
 // ── VELO$IPE ECONOMY ──────────────────────────────────────────────
 // Игровая валюта внутри Nethgram. Не настоящая криптовалюта.
@@ -302,6 +309,8 @@ const GM_IMPACT = 0.01;
 const TRADE_FEE = 0.05;            // комиссия биржи за вход в актив и за выход из него (5% + 5%)
 const VLP_FEE   = 0.03;            // комиссия за покупку и продажу $VLP (3% + 3%)
 const LEVERAGES = [1, 2, 5, 10];   // кредитное плечо для вложений в звёздах
+const MAX_POS_STARS = 50000;       // максимум вложений в один актив, в звёздах
+const MAX_POS_VLP   = 100;         // максимум вложений в один актив, в $VLP
 const LIQ_LEVEL = 0.1;             // ликвидация, когда от вложенного осталось 10%            // каждая сделка двигает курс на 1%
 const giftMarket  = new Map();     // giftId -> {rate, prevRate, series, stock, ev, trend}
 const nftListings = [];            // [{id, sellerId, sellerName, price, ts, nft}]
@@ -394,19 +403,19 @@ const MKT = {
   drift: -0.0004,      // курс в спокойное время медленно сползает вниз (держится ниже базы)
 };
 function rnd(a, b) { return a + Math.random() * (b - a); }
-function pumpTarget() { // во сколько раз вырастет: чаще ×1.2–1.6, иногда ×1.6–2.5, редко ×2.5–4
+function pumpTarget() { // во сколько раз вырастет: чаще ×1.05–1.25, иногда ×1.25–1.6, редко ×1.6–2.2
   const r = Math.random();
-  if (r < 0.7) return rnd(1.2, 1.6);
-  if (r < 0.95) return rnd(1.6, 2.5);
-  return rnd(2.5, 4);
+  if (r < 0.75) return rnd(1.05, 1.25);
+  if (r < 0.97) return rnd(1.25, 1.6);
+  return rnd(1.6, 2.2);
 }
-// Подарки: иксы редкие — чаще ×1.3–2, иногда ×2–3.5, совсем редко ×3.5–6
+// Подарки: чаще ×1.1–1.4, иногда ×1.4–2, совсем редко ×2–3
 const GIFT_PUMP = { chanceMul: 0.8 };   // пампы на подарках чуть реже обычного
 function giftPumpTarget() {
   const r = Math.random();
-  if (r < 0.65) return rnd(1.3, 2);
-  if (r < 0.93) return rnd(2, 3.5);
-  return rnd(3.5, 6);
+  if (r < 0.7) return rnd(1.1, 1.4);
+  if (r < 0.95) return rnd(1.4, 2);
+  return rnd(2, 3);
 }
 function startEvent(m, kind, mult, ticks) {
   m.ev = { kind, ticksLeft: ticks, perTick: Math.pow(mult, 1 / ticks), from: m.rate };
@@ -425,7 +434,7 @@ function stepRate(m, base, min, max, scale, o) {
       if (wasPump && Math.random() < MKT.afterPumpDump) {
         const gain = nr / ended.from, keep = rnd(0.1, 0.6);
         const target = Math.pow(gain, keep) / gain; // доля, до которой падаем
-        m.pendingDump = { mult: Math.max(0.05, target), delay: Math.floor(rnd(2, 20)) };
+        m.pendingDump = { mult: Math.max(0.05, target), delay: Math.floor(rnd(1, 6)) };   // слив почти сразу
       }
     }
   } else if (m.pendingDump && --m.pendingDump.delay <= 0) {
@@ -433,7 +442,7 @@ function stepRate(m, base, min, max, scale, o) {
     m.pendingDump = null; started = 'dump';
     nr = rate;
   } else if (Math.random() < MKT.pumpChance * scale * (o.pumpMul || 1)) {
-    startEvent(m, 'pump', (o.pumpTarget || pumpTarget)(), Math.floor(rnd(8, 48)));   // 2–12 минут роста
+    startEvent(m, 'pump', (o.pumpTarget || pumpTarget)(), Math.floor(rnd(3, 10)));   // 45 с – 2,5 мин роста
     started = 'pump'; nr = rate;
   } else if (Math.random() < MKT.crashChance * scale) {
     startEvent(m, 'crash', rnd(0.15, 0.65), Math.floor(rnd(2, 12)));  // −35…−85% за 0,5–3 минуты
@@ -451,8 +460,7 @@ function stepRate(m, base, min, max, scale, o) {
   return { rate: m.rate, started, ended };
 }
 function eventNews(name, target, res, prevRate) {
-  if (res.started === 'pump') addNews('🔥 АЖИОТАЖ', name + ': начинается памп! Покупатели сметают всё.', target, pct(prevRate, res.rate));
-  else if (res.started === 'crash') addNews('🚨 ПАНИКА', name + ': начинается обвал, все бегут к выходу.', target, pct(prevRate, res.rate));
+  if (res.started === 'crash') addNews('🚨 ПАНИКА', name + ': начинается обвал, все бегут к выходу.', target, pct(prevRate, res.rate));
   else if (res.started === 'dump') addNews('📉 ФИКСАЦИЯ ПРИБЫЛИ', name + ': киты сливают после пампа.', target, pct(prevRate, res.rate));
   if (res.ended) {
     const k = res.rate / res.ended.from, total = pct(res.ended.from, res.rate);
@@ -1460,23 +1468,34 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     return { text: '✅ Лимит $VLP сброшен: было куплено ' + was.toLocaleString('ru-RU') + ' / ' + VLP_DAILY_LIMIT.toLocaleString('ru-RU') + ', теперь снова доступно ' + VLP_DAILY_LIMIT.toLocaleString('ru-RU') + ' $VLP.' };
   }
 
-  // /sr — скрытая команда: обнулить звёзды у всех пользователей (нужно подтверждение)
-  if (t === '/sr' || t.startsWith('/sr ')) {
+  // /rs (и старое /sr) — скрытая команда: обнулить ВСЮ валюту у всех: звёзды, NSC, $VLP, вложения в активы.
+  // Подарки, NFT и лоты на бирже подарков не трогаются. Нужно подтверждение.
+  if (/^\/(rs|sr)(\s|$)/i.test(t)) {
     if (!isAdmin) return { text: '🔒 Команда доступна только после авторизации.\n\nИспользуйте /l [пароль]' };
+    const cmdName = t.slice(0, 3).toLowerCase();
     if (t.substring(3).trim().toLowerCase() !== 'да') {
-      let withStars = 0; for (const b of userStars.values()) if (b > 0) withStars++;
-      return { text: '⚠️ Это обнулит звёзды у ВСЕХ пользователей (' + withStars + ' с ненулевым балансом), включая бесконечные. Отменить нельзя.\n\nДля подтверждения отправьте: /sr да' };
+      let withMoney = 0;
+      for (const u of users.values()) { const w = userWorth(u.id); if (w.stars > 0 || w.nsc > 0 || w.vlp > 0 || w.inv > 0) withMoney++; }
+      return { text: '⚠️ Это обнулит у ВСЕХ пользователей (' + withMoney + ' с деньгами) всю валюту: звёзды (включая бесконечные), NSC, $VLP и все вложения в активы и акции. Подарки и NFT останутся.\n\nОтменить нельзя. Для подтверждения отправьте: ' + cmdName + ' да' };
     }
-    let n = 0;
-    for (const [uid, b] of userStars) {
-      if (b === 0) continue;
-      userStars.set(uid, 0); n++;
-      const u = users.get(uid);
-      if (u && isSocketOpen(u.ws)) safeSend(u.ws, starsSyncMsg(uid));
-    }
+    const touched = new Set();
+    for (const [uid, b] of userStars) if (b !== 0) { userStars.set(uid, 0); touched.add(uid); }
+    for (const [uid, n] of userNsc) if (n) touched.add(uid);
+    userNsc.clear();
+    for (const [uid, rec] of userVelosipe) { if (rec.balance) touched.add(uid); rec.balance = 0; rec.basis = 0; }
+    for (const [uid, list] of userPositions) if (list.length) touched.add(uid);
+    userPositions.clear();
+    velosipe.available = VLP_TOTAL_SUPPLY;   // все $VLP вернулись в резерв
     scheduleSave();
-    console.log('⭐ /sr: звёзды обнулены у ' + n + ' пользователей');
-    return { text: '✅ Готово: звёзды обнулены у ' + n + ' пользователей.' };
+    for (const uid of touched) {
+      const u = users.get(uid);
+      if (!u || !isSocketOpen(u.ws)) continue;
+      safeSend(u.ws, starsSyncMsg(uid));
+      safeSend(u.ws, walletView(uid));
+      safeSend(u.ws, velosipeSnapshot(uid, '1d'));
+    }
+    console.log('💸 ' + cmdName + ': валюта обнулена у ' + touched.size + ' пользователей');
+    return { text: '✅ Готово: у ' + touched.size + ' пользователей обнулены звёзды, NSC, $VLP и вложения. Подарки не тронуты.' };
   }
 
   // /sets [кол-во] — установить свой баланс точно на это число
@@ -3750,6 +3769,15 @@ server.on('upgrade', (req, socket) => {
         if (!amount) { send({ type:'velosipe_error', text:'Введите сумму' }); break; }
         const a = assetsMarket.get(def.id);
         const lev = currency === 'stars' && LEVERAGES.includes(Number(msg.lev)) ? Number(msg.lev) : 1;
+        // нельзя закинуть миллиард в один актив: общий лимит вложений на актив
+        const cap = currency === 'stars' ? MAX_POS_STARS : MAX_POS_VLP;
+        const already = positionsOf(userId).filter(p => p.assetId === def.id && p.currency === currency).reduce((n, p) => n + (p.cost || 0), 0);
+        if (already + amount > cap) {
+          const left = Math.max(0, cap - already), unit = currency === 'stars' ? ' ⭐' : ' $VLP';
+          send({ type:'velosipe_error', text: 'Лимит вложений в один актив — ' + cap.toLocaleString('ru-RU') + unit + '. ' +
+            (left > 0 ? 'Можно добавить ещё ' + left.toLocaleString('ru-RU') + unit : 'Сначала продайте часть позиции') });
+          break;
+        }
         let basisShare = 0;
         if (currency === 'stars') {
           const stars = userStars.get(userId) || 0;
