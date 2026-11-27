@@ -2300,6 +2300,134 @@ html.dark .ep-mode-tab:hover{background:#1a1a1a}
 .vx-pos .row .up b{color:var(--g)}.vx-pos .row .down b{color:var(--r)}
 .vlx-brand>div{min-width:0}.vlx-brand small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:520px){.vlx-brand small{display:none}.vlx-top{gap:8px;padding-left:12px;padding-right:12px}.vlx-chip{padding:7px 10px}}
+
+/* ══ VELO$IPE в цветах темы приложения (светлая / тёмная) ══ */
+.vlx,.vlp-trade{--fg:var(--text);--mut:var(--text2);--glass:var(--surface);--line:rgba(0,0,0,.08);--soft:rgba(0,0,0,.045);--soft2:rgba(0,0,0,.09);
+  --a1:var(--accent);--a2:var(--accent2);--g:#1fa868;--r:#e5484d;--vbg:var(--bg2);--vshadow:0 1px 2px rgba(16,35,47,.1)}
+html.dark .vlx,html.dark .vlp-trade{--line:rgba(255,255,255,.07);--soft:rgba(255,255,255,.055);--soft2:rgba(255,255,255,.12);--g:#3ddc97;--r:#ff5d6e;--vbg:var(--bg);--vshadow:none}
+.vlx{background:var(--vbg);color:var(--fg)}
+.vlx-bg{display:none}
+.vlx-back,.vlx-chip,.vlx-tab,.vx-pill{background:var(--surface);color:var(--fg);border-color:var(--line);backdrop-filter:none;-webkit-backdrop-filter:none}
+.vlx-back:hover{background:var(--soft2)}
+.vlx-tab,.vx-pill{color:var(--mut)}.vlx-tab:hover{color:var(--fg)}
+.vlx-tab.on{color:#fff;background:var(--accent);border-color:transparent;box-shadow:none}
+.vlx-ticker{background:var(--surface)}
+.tk .tk-p,.vx-lg span{color:var(--fg)}
+.vx-card,.vx-asset,.vx-news,.vx-pos,.vx-nft{background:var(--surface);border-color:var(--line);box-shadow:var(--vshadow);backdrop-filter:none;-webkit-backdrop-filter:none}
+.vx-asset:hover{border-color:var(--accent);box-shadow:var(--vshadow)}
+.vx-asset.up:hover,.vx-asset.down:hover{box-shadow:var(--vshadow)}
+.vx-badge.flat,.vx-seg,.vx-chip,.vx-cell,.vx-pnl,.vx-aico,.vx-row .bd,.vx-news .m b,.vx-nft-sell input,.vx-gico,
+.vlp-seg,.vlp-input,.vlp-quick button,.vlp-btn.ghost,.vx-btn.ghost{background:var(--soft)}
+.vx-seg button.on,.vx-pill.on,.vlp-seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+html.dark .vx-seg button.on,html.dark .vx-pill.on,html.dark .vlp-seg button.on{background:var(--soft2);box-shadow:none}
+.vx-seg button,.vlp-seg button{color:var(--mut)}
+.vx-svg text{fill:var(--mut)}
+.vx-gl{stroke:var(--soft2)}
+.vx-cross line{stroke:var(--mut)}.vx-cross circle{fill:var(--surface)}
+.vx-tip{background:var(--surface);color:var(--fg);border-color:var(--line);box-shadow:0 6px 24px rgba(0,0,0,.18);backdrop-filter:none}
+.vx-invest{color:#fff;background:linear-gradient(120deg,var(--accent),var(--accent2));border-color:transparent}
+.vx-limit .txt b,.vx-ainfo b,.vx-aprice,.vx-nft-info b,.vx-pos .row b,.vx-nft-sell input,.vlp-input input{color:var(--fg)}
+.vx-news .x,.vx-desc,.vlp-sum,.vlp-quick button{color:var(--fg)}
+.vx-btn.ghost,.vlp-btn.ghost{color:var(--fg);border-color:var(--line)}
+.vx-nft-sell input:focus{border-color:var(--accent)}
+.vx-dock{background:linear-gradient(transparent,var(--vbg) 45%)}
+.vx-skel{background:linear-gradient(100deg,var(--soft) 30%,var(--soft2) 50%,var(--soft) 70%);background-size:200% 100%}
+.vlx-scroll::-webkit-scrollbar-thumb{background:var(--soft2)}
+.vlp-trade{background:rgba(0,0,0,.45);backdrop-filter:none}
+.vlp-modal{background:var(--surface);color:var(--fg);border-color:var(--line);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.vlp-modal .sub,.vlp-input span,.vlp-sum small{color:var(--mut)}
+.vlp-input{border-color:var(--line)}
+.vlp-input:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light)}
+.vlp-quick button{border-color:var(--line)}.vlp-quick button:hover{background:var(--soft2)}
+.vlp-warn{color:var(--r)}
+.vx-badge.up{background:rgba(31,168,104,.12)}.vx-badge.down{background:rgba(229,72,77,.12)}
+.vx-btn.buy,.vlp-btn.buy{background:var(--g);box-shadow:none}
+.vx-btn.sell,.vlp-btn.sell,.vlp-lev button.on,.vx-lev{background:var(--r);box-shadow:none}
+.vx-row{border-color:var(--line)}
+
+/* ══ КОШЕЛЁК — полный экран, в цветах темы ══ */
+.wlt{position:fixed;inset:0;z-index:805;display:none;flex-direction:column;background:var(--bg2);color:var(--text);font-family:"Roboto",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+html.dark .wlt{background:var(--bg)}
+.wlt *{box-sizing:border-box}
+.wlt.open{display:flex;animation:vxIn .28s cubic-bezier(.16,1,.3,1) both}
+.wlt-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:calc(8px + env(safe-area-inset-top)) 16px 4px;max-width:560px;width:100%;margin:0 auto}
+.wlt-x{justify-self:start;border:0;background:none;color:var(--accent);font:400 17px "Roboto",sans-serif;cursor:pointer;padding:8px 0}
+.wlt-title{text-align:center;font-weight:600;font-size:17px;line-height:1.2}
+.wlt-title small{display:block;font-weight:400;font-size:13px;color:var(--text2)}
+.wlt-scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.wlt-wrap{max-width:560px;margin:0 auto;padding:8px 16px calc(28px + env(safe-area-inset-bottom))}
+.wlt-bal{text-align:center;padding:26px 0 6px}
+.wlt-bal-l{font-size:16px;color:var(--text2)}
+.wlt-bal-v{display:flex;align-items:center;justify-content:center;gap:8px;font-size:clamp(40px,12vw,56px);font-weight:700;letter-spacing:-1px;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
+.wlt-bal-v img{width:.62em;height:.62em;object-fit:contain}
+.wlt-bal-s{font-size:14px;color:var(--text2);margin-top:6px}
+.wlt-acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:24px 0 20px}
+.wlt-act{display:flex;flex-direction:column;align-items:center;gap:8px;border:0;background:none;color:var(--accent);font:500 15px "Roboto",sans-serif;cursor:pointer;padding:4px 0;-webkit-tap-highlight-color:transparent}
+.wlt-act i{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;transition:transform .12s}
+.wlt-act:active i{transform:scale(.9)}
+.wlt-act svg{width:18px;height:18px}
+.wlt-card{background:var(--surface);border-radius:14px;display:flex;align-items:center;gap:14px;padding:12px 16px;margin-bottom:10px;cursor:pointer;transition:background .12s}
+.wlt-card:active{background:var(--hover)}
+.wlt-ico{width:46px;height:46px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-weight:800;font-size:20px}
+.wlt-ico img{width:30px;height:30px;object-fit:contain}
+.wlt-ico.star{background:radial-gradient(circle at 35% 30%,#ffe27a,#f7a600)}
+.wlt-ico.vlp{background:linear-gradient(135deg,#8b5cf6,#2aabee)}
+.wlt-ico.inv{background:linear-gradient(135deg,#25d98f,#12a86c)}
+.wlt-ico.nsc{background:none}
+.wlt-ico.nsc .wlt-lot{width:46px;height:46px}
+.wlt-lot{display:flex;align-items:center;justify-content:center;line-height:1}
+.wlt-lot.fb{font-size:34px}.wlt-coin.fb{font-size:64px}
+.wlt-bal-v span{font-size:.6em}
+.wlt-mid{flex:1;min-width:0}
+.wlt-mid b{display:flex;align-items:center;gap:6px;font-size:17px;font-weight:500;white-space:nowrap}
+.wlt-mid b em{font-style:normal;font-size:12px;font-weight:500;color:var(--text2)}
+.wlt-mid small{display:block;font-size:14px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wlt-right{text-align:right;font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.wlt-right small{display:block;font-size:13px;color:var(--text2);margin-top:2px}
+.wlt-right .up{color:#1fa868}.wlt-right .down{color:#e5484d}
+.wlt-h{font-size:14px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin:24px 4px 8px}
+.wlt-list{background:var(--surface);border-radius:14px;overflow:hidden}
+.wlt-tx{display:flex;align-items:center;gap:14px;padding:11px 16px}
+.wlt-tx+.wlt-tx{border-top:1px solid var(--border)}
+html.dark .wlt-tx+.wlt-tx{border-top-color:rgba(255,255,255,.06)}
+.wlt-tx .wlt-ico{width:40px;height:40px;background:var(--accent)}
+.wlt-tx .wlt-ico svg{width:20px;height:20px}
+.wlt-tx .wlt-ico.in{background:#1fa868}
+.wlt-tx .wlt-ico.ex{background:#8b5cf6}
+.wlt-tx .wlt-mid b{font-size:16px}
+.wlt-tx .wlt-right{font-size:16px}
+.wlt-empty{padding:22px 16px;text-align:center;color:var(--text2);font-size:14px}
+/* нижние окна: обмен и перевод */
+.wlt-sheet{position:fixed;inset:0;z-index:806;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.42)}
+.wlt-sheet.open{display:flex}
+.wlt-pane{width:100%;max-width:480px;max-height:92vh;overflow-y:auto;background:var(--surface);color:var(--text);border-radius:18px 18px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom));animation:wltUp .26s cubic-bezier(.16,1,.3,1) both}
+@media(min-width:600px){.wlt-sheet{align-items:center}.wlt-pane{border-radius:18px}}
+@keyframes wltUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.wlt-grab{width:36px;height:4px;border-radius:2px;background:var(--bg3);margin:0 auto 12px}
+.wlt-pane h3{margin:0 0 4px;text-align:center;font-size:18px;font-weight:600}
+.wlt-pane .wlt-sub{text-align:center;font-size:13.5px;color:var(--text2);margin-bottom:14px;line-height:1.4}
+.wlt-coin{width:84px;height:84px;margin:0 auto 6px}
+.wlt-seg{display:flex;background:var(--bg2);border-radius:10px;padding:3px;margin-bottom:14px}
+.wlt-seg button{flex:1;border:0;background:none;color:var(--text2);padding:8px;border-radius:8px;font:500 14px "Roboto",sans-serif;cursor:pointer}
+.wlt-seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+html.dark .wlt-seg button.on{background:var(--bg3)}
+.wlt-field{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1.5px solid transparent;border-radius:12px;padding:10px 14px;margin-bottom:10px;transition:border-color .15s}
+.wlt-field:focus-within{border-color:var(--accent)}
+.wlt-field input{flex:1;min-width:0;border:0;background:none;outline:none;color:var(--text);font:500 16px "Roboto",sans-serif}
+.wlt-field.big input{font-size:26px;font-weight:700}
+.wlt-field span{font-size:14px;font-weight:600;color:var(--text2);white-space:nowrap}
+.wlt-quick{display:flex;gap:6px;margin-bottom:10px}
+.wlt-quick button{flex:1;padding:8px 0;border-radius:10px;border:0;background:var(--bg2);color:var(--text);font:500 13px "Roboto",sans-serif;cursor:pointer}
+.wlt-chips{display:flex;gap:6px;overflow-x:auto;margin:-2px 0 10px;scrollbar-width:none}
+.wlt-chips::-webkit-scrollbar{display:none}
+.wlt-chips button{flex-shrink:0;padding:6px 12px;border-radius:16px;border:0;background:var(--accent-light);color:var(--accent);font:500 13px "Roboto",sans-serif;cursor:pointer;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wlt-chips button.on{background:var(--accent);color:#fff}
+.wlt-sum{font-size:14px;color:var(--text2);text-align:center;min-height:20px;margin:4px 0 6px;line-height:1.45}
+.wlt-sum b{color:var(--text)}
+.wlt-err{font-size:13px;color:#e5484d;text-align:center;min-height:18px;margin-bottom:8px}
+.wlt-go{width:100%;border:0;border-radius:12px;padding:14px;background:var(--accent);color:#fff;font:600 16px "Roboto",sans-serif;cursor:pointer}
+.wlt-go[disabled]{opacity:.5;cursor:default}
+.wlt-go.ghost{background:var(--bg2);color:var(--text);margin-top:8px}
 /* ══ ФОН ПРОФИЛЯ (Premium) ══ */
 .bg-prem-tag{margin-left:6px;font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,#a855f7,#6366f1);padding:2px 7px;border-radius:10px;letter-spacing:.3px;vertical-align:1px}
 .bg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:8px 20px 6px}
@@ -4412,7 +4540,7 @@ function handleWS(msg) {
       // Refresh gift grid if open so admin gifts appear
       const gg = document.getElementById('giftGrid');
       if (gg && gg.children.length > 0) renderGiftGrid();
-      showToast('Nethgram', '🔓 Доступ к эксклюзивным подаркам открыт!', 'logo');
+      if (!msg.silent) showToast('Nethgram', '🔓 Доступ к эксклюзивным и скрытым подаркам открыт!', 'logo');
       break;
     }
 
@@ -4833,7 +4961,20 @@ function handleWS(msg) {
       showToast('Звёзды отправлены', `⭐ ${Number(msg.amount).toLocaleString('ru-RU')} → ${msg.toName || ''}`, 'logo', '#34c759');
       break;
     }
+    case 'wallet': {
+      walletOnData(msg);
+      break;
+    }
+    case 'wallet_error': {
+      walletOnError(msg.text);
+      break;
+    }
     case 'stars_send_failed': {
+      if (WLT.sheet === 'send') {
+        if (typeof msg.balance === 'number') { starBalance = msg.balance; isStarsUnlimited = msg.balance >= 999_999_999; updateStarsUI(); }
+        walletOnError(msg.text || 'Не удалось отправить');
+        break;
+      }
       if (typeof msg.balance === 'number') { starBalance = msg.balance; isStarsUnlimited = msg.balance >= 999_999_999; updateStarsUI(); }
       const e = document.getElementById('ssErr'), b = document.getElementById('ssGo');
       if (e && starsSendTo) { e.textContent = msg.text || 'Не удалось отправить'; if (b) { b.disabled = false; b.textContent = 'Отправить'; } }
@@ -4845,6 +4986,7 @@ function handleWS(msg) {
       starsHistory.unshift({ type:'unlim', amount: msg.amount, label:'Перевод от ' + safeText(msg.fromName || 'пользователя'), date: starsHistNow() });
       updateStarsUI();
       showToast('Вам перевели звёзды', `⭐ +${Number(msg.amount).toLocaleString('ru-RU')} от ${msg.fromName || 'пользователя'}`, 'logo', '#34c759');
+      if (WLT.open) wsSend({ type:'wallet_get' });
       break;
     }
 
@@ -6823,7 +6965,7 @@ function updateDailyBtn() {
   if (canClaimDaily()) {
     btn.disabled = false;
     txt.textContent = 'Получить ежедневную награду';
-    cd.textContent = '+100 ⭐';
+    cd.textContent = '+50 ⭐';
   } else {
     btn.disabled = true;
     txt.textContent = 'Следующая награда через';
@@ -7141,8 +7283,7 @@ function renderGiftGrid() {
 
   sorted.forEach((gift, i) => {
     // Admin-only gifts: hide completely if not admin; hidden — скрыты из магазина для всех
-    if (gift.adminOnly && !isAdminAuthorized) return;
-    if (gift.hidden) return;
+    if ((gift.adminOnly || gift.hidden) && !isAdminAuthorized) return;
 
     const remaining = giftStock[gift.id];
     const soldOut = (globalSoldOut && !isAdminAuthorized) || (gift.limited && remaining !== null && remaining <= 0);
@@ -10009,6 +10150,16 @@ function closeContactProfile() {
   <main class="vlx-scroll" id="vlpSheetBody"></main>
   <div class="vx-dock" id="vxSheetDock"></div>
 </div>
+<!-- КОШЕЛЁК -->
+<div class="wlt" id="walletOverlay">
+  <header class="wlt-top">
+    <button class="wlt-x" onclick="closeWallet()">Закрыть</button>
+    <div class="wlt-title">Кошелёк<small>Nethgram</small></div>
+    <span></span>
+  </header>
+  <main class="wlt-scroll"><div class="wlt-wrap" id="walletBody"></div></main>
+</div>
+<div class="wlt-sheet" id="walletSheet" onclick="if(event.target===this)closeWalletSheet()"><div class="wlt-pane" id="walletPane"></div></div>
 <div class="vlp-trade" id="vlpTrade" onclick="if(event.target===this)closeTrade()"><div class="vlp-modal" id="vlpModal"></div></div>
 <div class="vx-fx" id="vxFx"></div>
 <div class="stars-overlay" id="starsOverlay">
@@ -10529,6 +10680,7 @@ function closeContactProfile() {
       <div class="st-gap"></div>
       <div class="st-group">
         <div class="st-row" onclick="openPremiumModal()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24"><defs><linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6c93ff"/><stop offset=".5" stop-color="#a667ff"/><stop offset="1" stop-color="#e8689d"/></linearGradient></defs><path fill="url(#pg)" d="m12 1.5 3.2 6.6 7.3 1-5.3 5.1 1.3 7.2L12 17.9l-6.5 3.5 1.3-7.2L1.5 9.1l7.3-1z"/></svg></span><span class="st-label" id="premiumSettingsLabel">Nethgram Premium</span><span id="premiumBadgeSettings" class="st-active" style="display:none">Активен</span><span id="premiumSettingsSub" style="display:none"></span></div>
+        <div class="st-row" onclick="closeSettings();openWallet()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M21 9h-5a3 3 0 0 0 0 6h5z"/><circle cx="16" cy="12" r=".6" fill="currentColor"/></svg></span><span class="st-label">Кошелёк</span><span class="st-val" id="stWalletVal"></span></div>
         <div class="st-row" onclick="closeSettings();openStars()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="#f9b21a" d="m12 1.5 3.2 6.6 7.3 1-5.3 5.1 1.3 7.2L12 17.9l-6.5 3.5 1.3-7.2L1.5 9.1l7.3-1z"/></svg></span><span class="st-label">Мои звёзды</span><span class="st-val" id="stStarsVal">0</span></div>
         <div class="st-row" onclick="closeSettings();openVelosipe()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3h4"/></svg></span><span class="st-label">VELO$IPE</span></div>
         <div class="st-row" onclick="closeSettings();openSelfGiftShop()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></span><span class="st-label">Подарки</span></div>
@@ -10582,6 +10734,223 @@ function closeContactProfile() {
 </div>
 
 <script>
+// ═══════════ КОШЕЛЁК (звёзды, NSC, $VLP) ═══════════
+const WLT = { open:false, data:null, sheet:null, mode:'buy', cur:'stars', to:'', toName:'', busy:false, lot:[] };
+const wN = n => Math.floor(Number(n) || 0).toLocaleString('ru-RU');
+const wEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const wStar = () => `<img src="${STAR_IMG}" alt="⭐" style="width:1em;height:1em;vertical-align:-.14em;object-fit:contain">`;
+const W_ICO = {
+  send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  recv:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
+  swap:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>',
+};
+function wStarsTxt(d) { return d && d.unlim ? '∞' : wN(d ? d.stars : starBalance); }
+
+function openWallet() {
+  WLT.open = true;
+  document.getElementById('walletOverlay').classList.add('open');
+  renderWalletPage();
+  wsSend({ type:'wallet_get' });
+}
+function closeWallet() {
+  WLT.open = false;
+  closeWalletSheet();
+  document.getElementById('walletOverlay').classList.remove('open');
+  wDestroyLot();
+}
+function wDestroyLot() { WLT.lot.forEach(a => { try { a.destroy(); } catch (e) {} }); WLT.lot = []; }
+/** Анимированная монета NSC */
+function wMountCoins(root) {
+  const els = (root || document).querySelectorAll('.wlt-lot:not([data-on])');
+  if (!els.length) return;
+  ensureLottie(() => {
+    const L = window.lottie;
+    els.forEach(el => {
+      el.setAttribute('data-on', '1');
+      const fb = () => { el.textContent = '🪙'; el.classList.add('fb'); };
+      if (!L || !el.isConnected) { fb(); return; }
+      try {
+        const a = L.loadAnimation({ container:el, renderer:'svg', loop:true, autoplay:true, path:'/gifts/nsc.json' });
+        a.addEventListener('data_failed', fb);
+        WLT.lot.push(a);
+      } catch (e) { fb(); }
+    });
+  });
+}
+function walletOnData(d) {
+  WLT.data = d;
+  if (typeof d.stars === 'number') { starBalance = d.stars; isStarsUnlimited = d.stars >= 999_999_999; try { updateStarsUI(); } catch (e) {} }
+  const sv = document.getElementById('stWalletVal'); if (sv) sv.textContent = wN(d.total) + ' ⭐';
+  if (d.ok) {
+    WLT.busy = false;
+    closeWalletSheet();
+    if (d.ok === 'buy') showToast('Кошелёк', `🪙 Куплено ${wN(d.amount)} NSC`, 'logo', '#34c759');
+    else if (d.ok === 'sell') showToast('Кошелёк', `🪙 Продано ${wN(d.amount)} NSC`, 'logo', '#34c759');
+    else if (d.ok === 'send') showToast('Кошелёк', `🪙 ${wN(d.amount)} NSC → ${d.toName || 'пользователь'}`, 'logo', '#34c759');
+  }
+  if (d.notify) showToast('Вам перевели NSC', `🪙 +${wN(d.notify.amount)} NSC от ${d.notify.fromName || 'пользователя'}`, 'logo', '#34c759');
+  if (WLT.busy && WLT.sheet === 'send' && WLT.cur === 'stars') { WLT.busy = false; closeWalletSheet(); showToast('Кошелёк', '⭐ Звёзды отправлены', 'logo', '#34c759'); }
+  if (WLT.open) renderWalletPage();
+}
+function walletOnError(text) {
+  WLT.busy = false;
+  const e = document.getElementById('wErr'), b = document.getElementById('wGo');
+  if (b) b.disabled = false;
+  if (!text) return;
+  if (e && WLT.sheet) e.textContent = text; else showToast('Кошелёк', text, '⚠️', '#e74c3c');
+}
+function wTxRow(t) {
+  const isNsc = t.cur === 'nsc', unit = isNsc ? ' NSC' : ' ⭐';
+  let ico = 'send', cls = '', title = '', amt = '', sub = '';
+  if (t.type === 'buy')       { ico = 'swap'; cls = 'ex'; title = 'Покупка NSC';  amt = '+' + wN(t.amount) + ' NSC'; sub = '−' + wN(t.stars) + ' ⭐'; }
+  else if (t.type === 'sell') { ico = 'swap'; cls = 'ex'; title = 'Продажа NSC';  amt = '−' + wN(t.amount) + ' NSC'; sub = '+' + wN(t.stars) + ' ⭐'; }
+  else if (t.type === 'recv') { ico = 'recv'; cls = 'in'; title = 'Получено: ' + wEsc(t.peer || 'пользователь'); amt = '+' + wN(t.amount) + unit; sub = 'Получено'; }
+  else                        { title = 'Перевод: ' + wEsc(t.peer || 'пользователь'); amt = '−' + wN(t.amount) + unit; sub = 'Отправлено'; }
+  const when = new Date(t.ts).toLocaleString('ru-RU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  return `<div class="wlt-tx"><div class="wlt-ico ${cls}">${W_ICO[ico]}</div><div class="wlt-mid"><b>${title}</b><small>${when}</small></div><div class="wlt-right">${amt}<small>${sub}</small></div></div>`;
+}
+function renderWalletPage() {
+  const body = document.getElementById('walletBody'); if (!body) return;
+  const d = WLT.data;
+  const total = d ? (d.unlim ? '∞' : wN(d.total)) : '…';
+  const nsc = d ? d.nsc : 0, sell = d ? d.nscSell : 100, buy = d ? d.nscBuy : 105;
+  const ch = d ? Number(d.vlpChange) || 0 : 0;
+  const chTxt = (ch > 0 ? '+' : ch < 0 ? '−' : '') + Math.abs(ch).toFixed(2) + '%';
+  wDestroyLot();
+  body.innerHTML = `
+    <div class="wlt-bal">
+      <div class="wlt-bal-l">Баланс</div>
+      <div class="wlt-bal-v">${total} <img src="${STAR_IMG}" alt="⭐" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'⭐'}))"></div>
+      <div class="wlt-bal-s">${d && !d.unlim ? '≈ ' + wN(d.total / sell) + ' NSC' : 'звёзды, NSC, $VLP и активы'}</div>
+    </div>
+    <div class="wlt-acts">
+      <button class="wlt-act" onclick="openWalletSheet('send')"><i>${W_ICO.send}</i>Отправить</button>
+      <button class="wlt-act" onclick="openWalletSheet('swap')"><i>${W_ICO.swap}</i>Обменять</button>
+      <button class="wlt-act" onclick="closeWallet();openVelosipe()"><i>${W_ICO.chart}</i>Биржа</button>
+    </div>
+    <div class="wlt-card" onclick="openWalletSheet('swap')">
+      <div class="wlt-ico nsc"><div class="wlt-lot"></div></div>
+      <div class="wlt-mid"><b>NSC <em>стейблкоин</em></b><small>${wN(nsc)} NSC</small></div>
+      <div class="wlt-right">${wN(nsc * sell)} ⭐<small>1 NSC = ${sell}–${buy} ⭐</small></div>
+    </div>
+    <div class="wlt-card" onclick="closeWallet();openStars()">
+      <div class="wlt-ico star"><img src="${STAR_IMG}" alt="⭐" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'⭐'}))"></div>
+      <div class="wlt-mid"><b>Звёзды</b><small>${wStarsTxt(d)} ⭐</small></div>
+      <div class="wlt-right">${wStarsTxt(d)} ⭐</div>
+    </div>
+    <div class="wlt-card" onclick="closeWallet();openVelosipe()">
+      <div class="wlt-ico vlp">$</div>
+      <div class="wlt-mid"><b>VELO$IPE</b><small>${wN(d ? d.vlp : 0)} $VLP</small></div>
+      <div class="wlt-right">${wN(d ? d.vlpStars : 0)} ⭐<small class="${ch > 0 ? 'up' : ch < 0 ? 'down' : ''}">${chTxt}</small></div>
+    </div>
+    ${d && d.invest > 0 ? `<div class="wlt-card" onclick="closeWallet();openVelosipe()">
+      <div class="wlt-ico inv">${W_ICO.chart}</div>
+      <div class="wlt-mid"><b>Активы и акции</b><small>вложения на бирже</small></div>
+      <div class="wlt-right">${wN(d.invest)} ⭐</div>
+    </div>` : ''}
+    <div class="wlt-h">История транзакций</div>
+    <div class="wlt-list">${d && d.tx && d.tx.length ? d.tx.map(wTxRow).join('') : `<div class="wlt-empty">${d ? 'Пока нет операций' : 'Загрузка…'}</div>`}</div>`;
+  wMountCoins(body);
+}
+
+// ── нижние окна ──
+function openWalletSheet(kind, opt) {
+  WLT.sheet = kind; WLT.busy = false;
+  if (kind === 'swap') WLT.mode = (opt && opt.mode) || 'buy';
+  if (kind === 'send') { WLT.cur = (opt && opt.cur) || WLT.cur || 'stars'; WLT.to = ''; WLT.toName = ''; }
+  document.getElementById('walletSheet').classList.add('open');
+  renderWalletSheet();
+}
+function closeWalletSheet() {
+  WLT.sheet = null; WLT.busy = false;
+  const sh = document.getElementById('walletSheet'); if (sh) sh.classList.remove('open');
+}
+function wRecentUsers() {
+  try {
+    return [...contacts.values()].filter(c => c && c.type === 'user' && c.id && !String(c.id).startsWith('bot_'))
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 12);
+  } catch (e) { return []; }
+}
+function renderWalletSheet() {
+  const pane = document.getElementById('walletPane'); if (!pane) return;
+  const d = WLT.data || {};
+  const sell = d.nscSell || 100, buy = d.nscBuy || 105;
+  if (WLT.sheet === 'swap') {
+    const isBuy = WLT.mode === 'buy';
+    pane.innerHTML = `<div class="wlt-grab"></div>
+      <div class="wlt-coin wlt-lot"></div>
+      <h3>${isBuy ? 'Купить NSC' : 'Продать NSC'}</h3>
+      <div class="wlt-sub">NSC — стабильный коин Нефграма: курс не меняется.<br>Покупка ${buy} ⭐ · продажа ${sell} ⭐ за 1 NSC</div>
+      <div class="wlt-seg"><button class="${isBuy ? 'on' : ''}" onclick="WLT.mode='buy';renderWalletSheet()">Купить</button><button class="${isBuy ? '' : 'on'}" onclick="WLT.mode='sell';renderWalletSheet()">Продать</button></div>
+      <div class="wlt-field big"><input id="wAmt" inputmode="numeric" placeholder="0" oninput="wSwapInput()"><span>NSC</span></div>
+      <div class="wlt-quick"><button onclick="wQuick(1)">1</button><button onclick="wQuick(10)">10</button><button onclick="wQuick(100)">100</button><button onclick="wQuick('max')">Макс</button></div>
+      <div class="wlt-sum" id="wSum"></div>
+      <div class="wlt-err" id="wErr"></div>
+      <button class="wlt-go" id="wGo" onclick="wSwapGo()">${isBuy ? 'Купить' : 'Продать'}</button>`;
+    wMountCoins(pane);
+    wSwapInput();
+  } else if (WLT.sheet === 'send') {
+    const isNsc = WLT.cur === 'nsc';
+    const bal = isNsc ? wN(d.nsc || 0) + ' NSC' : (d.unlim || isStarsUnlimited ? '∞' : wN(d.stars ?? starBalance)) + ' ⭐';
+    const chips = wRecentUsers().map(c => `<button class="${WLT.to === c.id ? 'on' : ''}" onclick="wPick('${wEsc(c.id)}')">${wEsc(c.name || 'Пользователь')}</button>`).join('');
+    pane.innerHTML = `<div class="wlt-grab"></div>
+      <h3>Отправить</h3>
+      <div class="wlt-sub">Доступно: <b>${bal}</b></div>
+      <div class="wlt-seg"><button class="${isNsc ? '' : 'on'}" onclick="WLT.cur='stars';renderWalletSheet()">⭐ Звёзды</button><button class="${isNsc ? 'on' : ''}" onclick="WLT.cur='nsc';renderWalletSheet()">🪙 NSC</button></div>
+      <div class="wlt-field"><input id="wTo" placeholder="@юзернейм или номер телефона" value="${wEsc(WLT.toName ? '' : WLT.to)}" oninput="WLT.to=this.value.trim();WLT.toName='';wMarkChips()" autocomplete="off"></div>
+      ${chips ? `<div class="wlt-chips" id="wChips">${chips}</div>` : ''}
+      <div class="wlt-field big"><input id="wAmt" inputmode="numeric" placeholder="0" oninput="wSendInput()"><span>${isNsc ? 'NSC' : '⭐'}</span></div>
+      <div class="wlt-sum" id="wSum"></div>
+      <div class="wlt-err" id="wErr"></div>
+      <button class="wlt-go" id="wGo" onclick="wSendGo()">Отправить</button>`;
+    if (WLT.toName) { const i = document.getElementById('wTo'); if (i) i.placeholder = 'Получатель: ' + WLT.toName; }
+    wSendInput();
+  }
+}
+function wAmt() { const i = document.getElementById('wAmt'); if (!i) return 0; i.value = i.value.replace(/[^\d]/g, '').slice(0, 9); return parseInt(i.value, 10) || 0; }
+function wQuick(n) {
+  const d = WLT.data || {}, i = document.getElementById('wAmt'); if (!i) return;
+  if (n === 'max') n = WLT.mode === 'buy' ? Math.floor((d.unlim ? 1e6 * (d.nscBuy || 105) : (d.stars || 0)) / (d.nscBuy || 105)) : (d.nsc || 0);
+  i.value = Math.max(0, Math.min(n, 1000000)); wSwapInput();
+}
+function wSwapInput() {
+  const n = wAmt(), d = WLT.data || {}, sum = document.getElementById('wSum'); if (!sum) return;
+  document.getElementById('wErr').textContent = '';
+  if (!n) { sum.innerHTML = WLT.mode === 'buy' ? `Звёзд на счету: <b>${wStarsTxt(d)} ⭐</b>` : `NSC на счету: <b>${wN(d.nsc || 0)}</b>`; return; }
+  sum.innerHTML = WLT.mode === 'buy' ? `Спишется <b>${wN(n * (d.nscBuy || 105))} ⭐</b>` : `Вы получите <b>${wN(n * (d.nscSell || 100))} ⭐</b>`;
+}
+function wSwapGo() {
+  const n = wAmt(); if (!n) { document.getElementById('wErr').textContent = 'Введите количество NSC'; return; }
+  WLT.busy = true; document.getElementById('wGo').disabled = true;
+  wsSend({ type: WLT.mode === 'buy' ? 'nsc_buy' : 'nsc_sell', amount:n });
+}
+function wPick(id) {
+  const c = contacts.get(id); if (!c) return;
+  WLT.to = id; WLT.toName = c.name || 'Пользователь';
+  const i = document.getElementById('wTo'); if (i) { i.value = ''; i.placeholder = 'Получатель: ' + WLT.toName; }
+  wMarkChips(); wSendInput();
+}
+function wMarkChips() {
+  const box = document.getElementById('wChips'); if (!box) return;
+  const list = wRecentUsers();
+  [...box.children].forEach((b, k) => b.classList.toggle('on', !!list[k] && list[k].id === WLT.to));
+}
+function wSendInput() {
+  const n = wAmt(), sum = document.getElementById('wSum'); if (!sum) return;
+  document.getElementById('wErr').textContent = '';
+  const unit = WLT.cur === 'nsc' ? ' NSC' : ' ⭐';
+  sum.innerHTML = n ? `Перевод: <b>${wN(n)}${unit}</b>${WLT.toName ? ' → <b>' + wEsc(WLT.toName) + '</b>' : ''}` : 'Перевод без комиссии';
+}
+function wSendGo() {
+  const n = wAmt(), err = document.getElementById('wErr');
+  if (!WLT.to) { err.textContent = 'Укажите получателя'; return; }
+  if (!n) { err.textContent = 'Введите сумму'; return; }
+  WLT.busy = true; document.getElementById('wGo').disabled = true;
+  wsSend({ type:'wallet_send', to:WLT.to, currency:WLT.cur, amount:n });
+}
+</script>
+<script>
 // ═══════════ VELO$IPE (клиент, полноэкранный терминал) ═══════════
 const VLP = { open:false, tab:'market', period:'1d', loaded:false, market:null, assets:[], me:null, positions:[], trades:[], news:[], newsDot:false,
               base:{}, sheetId:null, sheetPoints:[], trade:null, timer:null, chartType:'line', filter:'all', chart:null, sheetChart:null,
@@ -10602,6 +10971,11 @@ const vCls = v => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
 const vArrow = v => v > 0 ? '▲' : v < 0 ? '▼' : '•';
 const vStars = () => isStarsUnlimited ? '♾️' : vN(VLP.me ? VLP.me.stars : starBalance);
 const vIn = () => VLP.enter ? ' vx-in' : '';
+/** Зелёный/красный цвет графика из текущей темы */
+function vxCol(up) {
+  try { const v = getComputedStyle(document.getElementById('vlpOverlay')).getPropertyValue(up ? '--g' : '--r').trim(); if (v) return v; } catch (e) {}
+  return up ? '#2ee59d' : '#ff5577';
+}
 const vSt = i => VLP.enter ? ` style="--i:${i}"` : '';
 
 function vlpLiveChange(item) { // изменение за выбранный период с учётом свежего курса
@@ -10737,7 +11111,7 @@ class VxChart {
     const X = t => pts.length === 1 ? (L + R) / 2 : L + ((t - t0) / span) * (R - L), Y = r => B - ((r - lo) / (hi - lo)) * (B - T);
     const first = pts[0].r, last = pts[pts.length - 1].r;
     this.dom = { t0, span, lo, hi, L, R, T, B, X, Y }; this.cands = cands || [];
-    this.el.style.setProperty('--c', last >= first ? '#2ee59d' : '#ff5577');
+    this.el.style.setProperty('--c', vxCol(last >= first));
     let g = '';
     const lyTag = Y(last);
     for (let i = 0; i <= 4; i++) {
@@ -10757,7 +11131,7 @@ class VxChart {
       const n = cands.length, bw = Math.max(3, (R - L) / n * 0.62);
       lx = L + (n - 0.5) / n * (R - L);
       cdl.innerHTML = cands.map((c, i) => {
-        const x = L + (i + 0.5) / n * (R - L), col = c.c >= c.o ? '#2ee59d' : '#ff5577', yo = Y(c.o), yc = Y(c.c);
+        const x = L + (i + 0.5) / n * (R - L), col = vxCol(c.c >= c.o), yo = Y(c.o), yc = Y(c.c);
         return `<g class="cd" style="animation-delay:${i * 14}ms"><line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${Y(c.h).toFixed(1)}" y2="${Y(c.l).toFixed(1)}" stroke="${col}" stroke-width="1.6" stroke-linecap="round"/><rect x="${(x - bw / 2).toFixed(1)}" y="${Math.min(yo, yc).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1.5, Math.abs(yo - yc)).toFixed(1)}" rx="2" fill="${col}"/></g>`;
       }).join('');
     }
@@ -10797,7 +11171,7 @@ function vxStats(pts) {
 let VX_SP = 0;
 function vxSpark(vals, up, w = 96, h = 36) {
   if (!vals || vals.length < 2) return `<svg class="vx-spark" viewBox="0 0 ${w} ${h}"></svg>`;
-  const lo = Math.min(...vals), rng = (Math.max(...vals) - lo) || 1, id = 'sp' + (++VX_SP), col = up ? '#2ee59d' : '#ff5577';
+  const lo = Math.min(...vals), rng = (Math.max(...vals) - lo) || 1, id = 'sp' + (++VX_SP), col = vxCol(up);
   const P = vals.map((v, i) => [2 + i * (w - 4) / (vals.length - 1), h - 3 - ((v - lo) / rng) * (h - 8)]), d = vxSmooth(P);
   return `<svg class="vx-spark" viewBox="0 0 ${w} ${h}"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".38"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
     <path d="${d} L${P[P.length - 1][0].toFixed(1)},${h} L${P[0][0].toFixed(1)},${h} Z" fill="url(#${id})"/><path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -10810,7 +11184,7 @@ function vxDonut(parts, o = {}) {
       `<circle class="vx-seg" cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${p.color}" stroke-width="${st}" pathLength="100" stroke-dasharray="${vis} ${100 - vis}" stroke-dashoffset="${-off}" transform="rotate(-90 ${c} ${c})"/>`;
     off += len; return s;
   }).join('');
-  return `<div class="vx-donut${o.anim ? ' anim' : ''}" style="width:${size}px;height:${size}px"><svg viewBox="0 0 ${size} ${size}"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="${st}"/>${segs}</svg><div class="vx-dc">${o.center || ''}</div></div>`;
+  return `<div class="vx-donut${o.anim ? ' anim' : ''}" style="width:${size}px;height:${size}px"><svg viewBox="0 0 ${size} ${size}"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(128,128,128,.16)" stroke-width="${st}"/>${segs}</svg><div class="vx-dc">${o.center || ''}</div></div>`;
 }
 
 // ── открытие / навигация ──
@@ -10931,7 +11305,7 @@ function renderStats() {
   const m = VLP.market, el = $('vxStats'); if (!el || !m) return;
   const share = m.circulating / m.totalSupply * 100;
   el.innerHTML = `<div class="vx-card${vIn()}"${vSt(2)}><div class="vx-h">Рынок VELO$IPE</div><div class="vx-stats">
-    ${vxDonut([{ v:m.circulating, color:'#8b5cf6' }, { v:m.available, color:'rgba(255,255,255,.1)' }], { size:136, stroke:15, anim:VLP.enter, center:`<b>${share.toFixed(share < 10 ? 1 : 0)}%</b><small>В ОБРАЩЕНИИ</small>` })}
+    ${vxDonut([{ v:m.circulating, color:'#8b5cf6' }, { v:m.available, color:'rgba(128,128,128,.22)' }], { size:136, stroke:15, anim:VLP.enter, center:`<b>${share.toFixed(share < 10 ? 1 : 0)}%</b><small>В ОБРАЩЕНИИ</small>` })}
     <div class="vx-cells">
       <div class="vx-cell"><small>Общий тираж</small><b>${vN(m.totalSupply)} $VLP</b></div>
       <div class="vx-cell"><small>Доступно для покупки</small><b>${vN(m.available)} $VLP</b></div>
@@ -10948,7 +11322,7 @@ function renderWallet() {
     <div class="vx-wallet-big">${vN(me.vlp)}<small>$VLP</small></div>
     <div class="vx-wallet-sub">≈ <span id="vxVal">${vN(VX_PREV.val ?? me.valueStars)}</span> ${vStar()} · ${me.locked ? vN(me.locked) + ' в инвестициях' : 'на балансе'}</div>
     <div class="vx-pnl"><div><small>Прибыль / убыток</small><b class="${vCls(me.pnl)}">${me.pnl > 0 ? '+' : me.pnl < 0 ? '−' : ''}${vN(Math.abs(me.pnl))} ${vStar()}</b></div><b class="${vCls(me.pnl)}">${vArrow(me.pnl)} ${vPct(me.pnlPct)}</b></div>
-    <div class="vx-limit">${vxDonut([{ v:me.boughtToday, color:'#8b5cf6' }, { v:left, color:'rgba(255,255,255,.1)' }], { size:86, stroke:10, anim:VLP.enter, center:`<b style="font-size:15px">${Math.round(lim)}%</b>` })}
+    <div class="vx-limit">${vxDonut([{ v:me.boughtToday, color:'#8b5cf6' }, { v:left, color:'rgba(128,128,128,.22)' }], { size:86, stroke:10, anim:VLP.enter, center:`<b style="font-size:15px">${Math.round(lim)}%</b>` })}
       <div class="txt">Куплено всеми сегодня<br><b>${vN(me.boughtToday)} / ${vN(me.dailyLimit)}</b> $VLP<br>Сброс через <b id="vlpReset">--:--:--</b></div></div>
     <div class="vx-cell" style="margin-bottom:12px"><small>Доступно звёзд</small><b>${vStars()} ${isStarsUnlimited ? '' : vStar()}</b></div>
     <div class="vx-btns"><button class="vx-btn buy" onclick="openTrade('buy')" ${left <= 0 || m.available <= 0 ? 'disabled' : ''}>Купить $VLP</button>

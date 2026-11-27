@@ -87,7 +87,7 @@ function countGiftBuy(uid, giftId) {
   r.n[giftId] = (r.n[giftId] || 0) + 1;
 }
 function dayKeyNow() { const d = new Date(); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }
-const DAILY_REWARD = 100, DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const DAILY_REWARD = 50, DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const premiumUsernames = new Map();
 const premiumUsers = new Set(); // у кого есть Nethgram Premium (выдаёт администратор: /premium @юзернейм)
 const PROFILE_BG_IDS = new Set(['aurora','sunset','ocean','forest','candy','midnight','lava','mint','gold','rose','cosmic','carbon']);
@@ -208,7 +208,7 @@ const NFT_UPGRADEABLE = new Set(['scared_cat','wine','plush_pepe','astral_shard'
 const VLP_TOTAL_SUPPLY = 500000;
 const VLP_START_RATE   = 500;
 const VLP_MIN_RATE     = 50;
-const VLP_MAX_RATE     = 100000;  // до ×200 от старта — место для огромных пампов
+const VLP_MAX_RATE     = 10000;   // потолок ×20 от старта
 const VLP_DAILY_LIMIT  = 10000;
 const VLP_TICK_MS      = 15000;
 const VLP_NEWS_MS      = 30000;
@@ -262,19 +262,35 @@ const userPositions  = new Map(); // userId -> [{assetId,currency,units,cost,bas
 const marketNews     = [];
 
 const ASSET_DEFS = [
-  { id:'rare_fish',      name:'Редкие рыбы',               icon:'🐟', category:'asset', start:100, desc:'Рынок редких рыб Нефграма' },
-  { id:'potato_fields',  name:'Картофельные поля в Литве', icon:'🥔', category:'asset', start:100, desc:'Инвестиции в картофельную империю' },
-  { id:'sand_farm',      name:'Ферма песка',               icon:'🏖️', category:'asset', start:100, desc:'Крупнейшая песчаная ферма Нефграма' },
-  { id:'rainbow_sheep',  name:'Разноцветные овцы',         icon:'🐑', category:'asset', start:100, desc:'Рынок разноцветных овец' },
-  { id:'stock_nethgram', name:'Nethgram',                  icon:'📱', category:'stock', start:250, desc:'Акции основной компании Нефграма' },
-  { id:'stock_velosipe', name:'Velosipe Inc.',             icon:'🚲', category:'stock', start:250, desc:'Компания, связанная с VELO$IPE' },
-  { id:'stock_tesla',    name:'Tesla',                     icon:'🚗', category:'stock', start:250, desc:'Шуточная акция Tesla в игровой экономике' },
-  { id:'stock_apple',    name:'Apple',                     icon:'🍎', category:'stock', start:250, desc:'Шуточная акция Apple в игровой экономике' },
-  { id:'stock_priton',   name:'Priton',                    icon:'🏢', category:'stock', start:250, desc:'Шуточная компания Нефграма' },
+  { id:'rare_fish',      name:'Редкие рыбы',               icon:'🐟', category:'asset', start:10,  desc:'Рынок редких рыб Нефграма' },
+  { id:'potato_fields',  name:'Картофельные поля в Литве', icon:'🥔', category:'asset', start:10,  desc:'Инвестиции в картофельную империю' },
+  { id:'sand_farm',      name:'Ферма песка',               icon:'🏖️', category:'asset', start:10,  desc:'Крупнейшая песчаная ферма Нефграма' },
+  { id:'rainbow_sheep',  name:'Разноцветные овцы',         icon:'🐑', category:'asset', start:10,  desc:'Рынок разноцветных овец' },
+  { id:'stock_nethgram', name:'Nethgram',                  icon:'📱', category:'stock', start:25,  desc:'Акции основной компании Нефграма' },
+  { id:'stock_velosipe', name:'Velosipe Inc.',             icon:'🚲', category:'stock', start:25,  desc:'Компания, связанная с VELO$IPE' },
+  { id:'stock_tesla',    name:'Tesla',                     icon:'🚗', category:'stock', start:25,  desc:'Шуточная акция Tesla в игровой экономике' },
+  { id:'stock_apple',    name:'Apple',                     icon:'🍎', category:'stock', start:25,  desc:'Шуточная акция Apple в игровой экономике' },
+  { id:'stock_priton',   name:'Priton',                    icon:'🏢', category:'stock', start:25,  desc:'Шуточная компания Нефграма' },
 ];
 const assetsMarket = new Map(); // id -> {rate, prevRate, series}
 ASSET_DEFS.forEach(a => assetsMarket.set(a.id, { rate:a.start, prevRate:a.start, series:newSeries(a.start) }));
 const assetDef = id => ASSET_DEFS.find(a => a.id === id);
+const ASSET_SCALE_VER = 2; // v2: активы и акции подешевели в 10 раз (стоимость позиций сохраняется)
+let assetScaleVer = ASSET_SCALE_VER; // свежая база сразу в новом масштабе
+/** Перевести сохранённые курсы активов в новый масштаб: курс ÷k, единицы позиций ×k — стоимость у игроков не меняется */
+function migrateAssetScale() {
+  if (assetScaleVer >= ASSET_SCALE_VER) return;
+  const k = 10;
+  const sc = arr => { for (const pt of arr || []) { if (typeof pt.r === 'number') pt.r = r2(pt.r / k); } };
+  for (const a of assetsMarket.values()) {
+    a.rate = r2(a.rate / k); a.prevRate = r2((a.prevRate || a.rate * k) / k);
+    if (a.series) { sc(a.series.raw); sc(a.series.m5); sc(a.series.h1); sc(a.series.d1); }
+    if (a.ev && a.ev.from) a.ev.from = a.ev.from / k;
+  }
+  for (const list of userPositions.values()) for (const pos of list) pos.units = (pos.units || 0) * k;
+  assetScaleVer = ASSET_SCALE_VER;
+  console.log('📉 Активы и акции переведены в новый масштаб (÷' + k + ')');
+}
 
 // ── БИРЖА ПОДАРКОВ ──
 // У каждого обычного подарка свой курс в звёздах (двигается тем же движком, что и $VLP).
@@ -305,7 +321,7 @@ function gmBid(def, g) {
   const bid = gmSellPrice(g);
   return shopSells(def) ? Math.min(bid, Math.floor(def.price * GIFT_SELL_RATE)) : bid;
 }
-function giftBounds(def) { return [Math.max(1, def.price / 10), def.price * 200]; } // потолок ×200 — место для огромных пампов
+function giftBounds(def) { return [Math.max(1, def.price / 10), def.price * 20]; } // потолок ×20
 function ensureGiftMarket() {
   for (const d of GIFT_DEFS_TRADABLE()) if (!giftMarket.has(d.id)) giftMarket.set(d.id, { rate:d.price, prevRate:d.price, series:newSeries(d.price), stock:0 });
 }
@@ -372,25 +388,25 @@ const MKT = {
   revert: 0.0015,      // притяжение к базе (слабое — чтобы курс мог надолго уходить далеко)
   spikeChance: 0.008,  // одиночная свеча ±6–25% (примерно раз в 30 мин), вниз чаще, чем вверх
   spikeDownBias: 0.62, // доля свечей вниз
-  pumpChance: 0.0016,  // начало пампа (примерно раз в 2,6 ч на рынок)
+  pumpChance: 0.0006,  // начало пампа (примерно раз в 7 ч на рынок)
   crashChance: 0.0026, // начало обвала (чаще пампов)
   afterPumpDump: 0.85, // после пампа в 85% случаев приходит слив
   drift: -0.0004,      // курс в спокойное время медленно сползает вниз (держится ниже базы)
 };
 function rnd(a, b) { return a + Math.random() * (b - a); }
-function pumpTarget() { // во сколько раз вырастет: чаще ×1.5–3, иногда ×3–10, редко ×10–40
+function pumpTarget() { // во сколько раз вырастет: чаще ×1.2–1.6, иногда ×1.6–2.5, редко ×2.5–4
   const r = Math.random();
-  if (r < 0.6) return rnd(1.5, 3);
-  if (r < 0.9) return rnd(3, 10);
-  return rnd(10, 40);
+  if (r < 0.7) return rnd(1.2, 1.6);
+  if (r < 0.95) return rnd(1.6, 2.5);
+  return rnd(2.5, 4);
 }
-// Подарки: пампы чаще и сильнее — чаще ×2–5, часто ×5–20, иногда ×20–100
-const GIFT_PUMP = { chanceMul: 1.8 };   // пампы на подарках в 1,8 раза чаще обычного
+// Подарки: иксы редкие — чаще ×1.3–2, иногда ×2–3.5, совсем редко ×3.5–6
+const GIFT_PUMP = { chanceMul: 0.8 };   // пампы на подарках чуть реже обычного
 function giftPumpTarget() {
   const r = Math.random();
-  if (r < 0.35) return rnd(2, 5);
-  if (r < 0.75) return rnd(5, 20);
-  return rnd(20, 100);
+  if (r < 0.65) return rnd(1.3, 2);
+  if (r < 0.93) return rnd(2, 3.5);
+  return rnd(3.5, 6);
 }
 function startEvent(m, kind, mult, ticks) {
   m.ev = { kind, ticksLeft: ticks, perTick: Math.pow(mult, 1 / ticks), from: m.rate };
@@ -423,7 +439,8 @@ function stepRate(m, base, min, max, scale, o) {
     startEvent(m, 'crash', rnd(0.15, 0.65), Math.floor(rnd(2, 12)));  // −35…−85% за 0,5–3 минуты
     started = 'crash'; nr = rate;
   } else if (Math.random() < MKT.spikeChance * scale) {
-    nr = rate * (1 + (Math.random() < MKT.spikeDownBias ? -1 : 1) * rnd(0.06, 0.25));
+    const down = Math.random() < MKT.spikeDownBias;
+    nr = rate * (1 + (down ? -rnd(0.06, 0.25) : rnd(0.04, 0.12)));   // свечи вверх меньше, чем вниз
   } else {
     if (Math.random() < MKT.trendChance || typeof m.trend !== 'number') m.trend = (Math.random() * 2 - 1) * MKT.trendMax;
     const noise = (Math.random() + Math.random() + Math.random() - 1.5) * MKT.noise * 1.4;
@@ -443,7 +460,7 @@ function eventNews(name, target, res, prevRate) {
     else addNews('💥 ОБВАЛ', name + ' упал на ' + Math.round((1 - k) * 100) + '%.', target, total);
   }
 }
-function assetBounds(def) { return [Math.max(1, def.start / 50), def.start * 200]; }
+function assetBounds(def) { return [Math.max(0.1, def.start / 50), def.start * 20]; }
 
 function addNews(title, text, target, change) {
   const entry = { id:genId(), ts:Date.now(), title, text, target, change };
@@ -497,7 +514,7 @@ function randomNewsEvent() {
     const t = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
     if (t.target === 'vlp' && Math.random() < 0.6) return; // новости про сам $VLP — реже
     const dir = t.dir || (Math.random() < 0.5 ? -1 : 1);
-    const change = shock(t.target, dir * (t.min + Math.random() * (t.max - t.min)) * 1.6);
+    const change = shock(t.target, dir * (t.min + Math.random() * (t.max - t.min)) * (dir > 0 ? 0.8 : 1.6)); // хорошие новости двигают слабее
     addNews(t.title, t.text, t.target, change);
     checkLiquidations();
   } catch (e) { console.error('randomNewsEvent error:', e.message); }
@@ -583,6 +600,76 @@ function meView(uid) {
   return { vlp:rec.balance, locked, stars:userStars.get(uid) || 0, boughtToday:sharedVlpDaily(), myBoughtToday:rec.boughtToday, dailyLimit:VLP_DAILY_LIMIT,
            valueStars, pnl, basis:Math.round(basis), pnlPct: basis > 0 ? r2((pnl / basis) * 100) : 0 };
 }
+// ── NSC — второй коин Нефграма. Стейблкоин: курс не меняется — купить 1 NSC = 105 ⭐, продать 1 NSC = 100 ⭐ ──
+const NSC_BUY  = 105;
+const NSC_SELL = 100;
+const NSC_MAX_OP = 1000000;
+const userNsc  = new Map(); // userId -> баланс NSC
+const walletTx = new Map(); // userId -> [{type, cur, amount, stars, peer, ts}]
+const nscOf = uid => userNsc.get(uid) || 0;
+function addWalletTx(uid, t) {
+  if (!walletTx.has(uid)) walletTx.set(uid, []);
+  const arr = walletTx.get(uid); arr.push({ ...t, ts:Date.now() });
+  if (arr.length > 100) arr.splice(0, arr.length - 100);
+}
+/** Всё, что есть у пользователя, в звёздах: звёзды + NSC + $VLP по курсу + вложения в активы */
+function userWorth(uid) {
+  const stars = starsOf(uid), unlim = stars >= UNLIMITED_STARS;
+  const rec = userVelosipe.get(uid), vlp = rec ? rec.balance : 0;
+  let inv = 0;
+  for (const p of (userPositions.get(uid) || [])) {
+    const a = assetsMarket.get(p.assetId); if (!a) continue;
+    const v = posValue(p, a.rate);
+    inv += p.currency === 'vlp' ? v * velosipe.rate : v;
+  }
+  const nsc = nscOf(uid), vlpStars = vlp * velosipe.rate, nscStars = nsc * NSC_SELL;
+  return { stars, unlim, vlp, vlpStars, inv, nsc, nscStars, total: (unlim ? 0 : stars) + vlpStars + inv + nscStars };
+}
+function walletView(uid) {
+  const w = userWorth(uid);
+  return { type:'wallet', stars:w.stars, unlim:w.unlim, nsc:w.nsc, vlp:w.vlp, vlpRate:velosipe.rate,
+           vlpChange:pct(velosipe.prevRate, velosipe.rate), vlpStars:Math.floor(w.vlpStars), invest:Math.floor(w.inv),
+           total:Math.floor(w.total), nscBuy:NSC_BUY, nscSell:NSC_SELL, tx:(walletTx.get(uid) || []).slice(-50).reverse() };
+}
+/** Найти получателя по @юзернейму, номеру телефона или id */
+function findUserByRef(ref) {
+  ref = String(ref || '').trim();
+  if (!ref) return null;
+  if (users.has(ref)) return users.get(ref);
+  const un = ref.replace(/^@/, '').toLowerCase();
+  const digits = ref.replace(/\D/g, '');
+  return [...users.values()].find(u =>
+    (u.username && u.username.toLowerCase() === un) ||
+    (digits.length >= 7 && u.phone && String(u.phone).replace(/\D/g, '') === digits)) || null;
+}
+
+/** Перевод звёзд другу (из чата или из кошелька). Возвращает true, если перевод прошёл. */
+function sendStarsTransfer(userId, toId, amount, send) {
+  const fail = text => send({ type:'stars_send_failed', text, balance: starsOf(userId) });
+  const sender = users.get(userId), rcpt = users.get(toId);
+  if (!amount) { fail('Введите количество звёзд'); return false; }
+  if (!rcpt || toId === userId || toId.startsWith('bot_')) { fail('Получатель не найден'); return false; }
+  if (!trySpendStars(userId, amount)) { fail('Недостаточно звёзд'); return false; }
+  addStarsTo(toId, amount);
+  const text = JSON.stringify({ isStars:true, amount, fromName: sender ? sender.name : '', toName: rcpt.name || '' });
+  const sm = { id:genId(), from:userId, text, time:timeNow(), ts:Date.now() };
+  const skey = chatKey(userId, toId);
+  if (!messages.has(skey)) messages.set(skey, []);
+  messages.get(skey).push(sm);
+  scheduleSave();
+  console.log('⭐ Перевод: ' + (sender && sender.name) + ' → ' + rcpt.name + ': ' + amount);
+  send({ type:'stars_sent', toId, toName: rcpt.name, amount, message: sm, balance: starsOf(userId) });
+  if (isSocketOpen(rcpt.ws)) {
+    safeSend(rcpt.ws, { type:'message', chatWith:userId, message: { ...sm, fromName: sender && sender.name } });
+    safeSend(rcpt.ws, { type:'stars_received', fromId:userId, fromName: sender ? sender.name : '', amount, balance: starsOf(toId) });
+    safeSend(rcpt.ws, { type:'new_message_notify', fromId:userId, fromName: sender && sender.name, text:'⭐ ' + amount.toLocaleString('ru-RU') + ' звёзд' });
+  }
+  pushNotify(toId, { ...pushItemFor(toId, userId, sm), text:'⭐ Вам перевели ' + amount.toLocaleString('ru-RU') + ' звёзд' });
+  addWalletTx(userId, { type:'send', cur:'stars', amount, peer: rcpt.name || '' });
+  addWalletTx(toId,   { type:'recv', cur:'stars', amount, peer: sender ? sender.name : '' });
+  return true;
+}
+
 function velosipeSnapshot(uid, period) {
   if (!VLP_PERIODS[period]) period = '1d';
   return { type:'velosipe_market', period, market:marketFull(period), assets:assetsFull(period), me:meView(uid),
@@ -594,13 +681,14 @@ function releaseUserVelosipe(uid) { // при удалении аккаунта 
   const held = (rec ? rec.balance : 0) + positionsOf(uid).filter(p => p.currency === 'vlp').reduce((s, p) => s + p.cost, 0);
   velosipe.available = Math.min(VLP_TOTAL_SUPPLY, velosipe.available + held);
   userVelosipe.delete(uid); velosipeTrades.delete(uid); userPositions.delete(uid);
+  userNsc.delete(uid); walletTx.delete(uid);
 }
 
 function serializeVelosipe() {
   const mapObj = m => { const o = {}; for (const [k, v] of m) o[k] = v; return o; };
   const assets = {}; for (const [id, a] of assetsMarket) assets[id] = a;
   return { market:velosipe, users:mapObj(userVelosipe), trades:mapObj(velosipeTrades), positions:mapObj(userPositions), assets, news:marketNews,
-           giftMarket:mapObj(giftMarket), nftListings };
+           giftMarket:mapObj(giftMarket), nftListings, assetScaleVer, nsc:mapObj(userNsc), walletTx:mapObj(walletTx) };
 }
 function loadVelosipe(d) {
   if (!d) return;
@@ -612,6 +700,10 @@ function loadVelosipe(d) {
   if (Array.isArray(d.news)) { marketNews.length = 0; marketNews.push(...d.news); }
   for (const [id, g] of Object.entries(d.giftMarket || {})) if (g && g.series) giftMarket.set(id, g);
   if (Array.isArray(d.nftListings)) { nftListings.length = 0; nftListings.push(...d.nftListings); }
+  for (const [k, v] of Object.entries(d.nsc || {})) { const n = Number(v); if (Number.isFinite(n) && n > 0) userNsc.set(k, Math.floor(n)); }
+  for (const [k, v] of Object.entries(d.walletTx || {})) if (Array.isArray(v)) walletTx.set(k, v);
+  assetScaleVer = Number(d.assetScaleVer) || (d.assets ? 1 : ASSET_SCALE_VER); // старая база без метки — пересчитать
+  migrateAssetScale();
   ensureGiftMarket();
   // самолечение: резерв всегда = тираж − всё, что на руках и в инвестициях
   let held = 0;
@@ -1431,24 +1523,13 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     const all = [...users.values()];
     if (all.length === 0) return { text: '👥 Пользователей пока нет.' };
     const fmt = n => Math.floor(n).toLocaleString('ru-RU');
-    const rows = all.map(u => {
-      const stars = userStars.get(u.id) || 0, unlim = stars >= UNLIMITED_STARS;
-      const rec = userVelosipe.get(u.id), vlp = rec ? rec.balance : 0;
-      let inv = 0;
-      for (const p of (userPositions.get(u.id) || [])) {
-        const a = assetsMarket.get(p.assetId); if (!a) continue;
-        const v = posValue(p, a.rate);
-        inv += p.currency === 'vlp' ? v * velosipe.rate : v;
-      }
-      const vlpStars = vlp * velosipe.rate;
-      return { u, stars, unlim, vlp, vlpStars, inv, total: (unlim ? 0 : stars) + vlpStars + inv };
-    }).sort((a, b) => (b.unlim - a.unlim) || (b.total - a.total));
+    const rows = all.map(u => ({ u, ...userWorth(u.id) })).sort((a, b) => (b.unlim - a.unlim) || (b.total - a.total));
     let sum = 0;
     const lines = rows.map((r, i) => {
       if (!r.unlim) sum += r.total;
       return (i + 1) + '. ' + (r.u.name || 'Без имени') + (r.u.username ? ' (@' + r.u.username + ')' : '') + ' — ' +
         (r.unlim ? '∞' : fmt(r.total)) + ' ⭐\n     ⭐ ' + (r.unlim ? '∞' : fmt(r.stars)) +
-        ' · $VLP ' + fmt(r.vlp) + ' (≈' + fmt(r.vlpStars) + ' ⭐) · активы ≈' + fmt(r.inv) + ' ⭐';
+        ' · NSC ' + fmt(r.nsc) + ' · $VLP ' + fmt(r.vlp) + ' (≈' + fmt(r.vlpStars) + ' ⭐) · активы ≈' + fmt(r.inv) + ' ⭐';
     });
     return { text: '💰 Балансы (' + all.length + ' польз., курс $VLP ' + velosipe.rate.toLocaleString('ru-RU') + ' ⭐)\nВсего ≈ ' + fmt(sum) + ' ⭐ (без бесконечных)\n\n' + lines.join('\n') };
   }
@@ -2228,6 +2309,7 @@ server.on('upgrade', (req, socket) => {
         if (premiumUsernames.has(userId)) send({ type:'premium_usernames_list', usernames: premiumUsernames.get(userId) });
         // globalSoldOut
         send({ type:'global_sold_out', value: globalSoldOut });
+        if (nethgramAdminUsers.has(userId)) send({ type:'admin_authorized', silent:true });
         break;
       }
 
@@ -2803,7 +2885,7 @@ server.on('upgrade', (req, socket) => {
           pushBotMsg(key, { ...newMsg, text: redactBotText(newMsg.text) });
           setTimeout(() => {
             const result = handleNethgramBot(msg.text, userId, userAdminBotAuthorized);
-            if (result.admin) { userAdminBotAuthorized = true; }
+            if (result.admin) { userAdminBotAuthorized = true; send({ type:'admin_authorized' }); }
             if (result.welcome) {
               const replyText = result.text.replace('{NAME}', senderUser?.name || '');
               const reply = botReply('bot_nethgram', replyText);
@@ -3025,27 +3107,63 @@ server.on('upgrade', (req, socket) => {
       // Перевести свои звёзды другому пользователю
       case 'send_stars': {
         if (!userId) break;
-        const toId = String(msg.toId || ''), amount = toInt(msg.amount);
-        const fail = text => send({ type:'stars_send_failed', text, balance: starsOf(userId) });
-        const sender = users.get(userId), rcpt = users.get(toId);
-        if (!amount) { fail('Введите количество звёзд'); break; }
-        if (!rcpt || toId === userId || toId.startsWith('bot_')) { fail('Получатель не найден'); break; }
-        if (!trySpendStars(userId, amount)) { fail('Недостаточно звёзд'); break; }
-        addStarsTo(toId, amount);
-        const text = JSON.stringify({ isStars:true, amount, fromName: sender ? sender.name : '', toName: rcpt.name || '' });
-        const sm = { id:genId(), from:userId, text, time:timeNow(), ts:Date.now() };
-        const skey = chatKey(userId, toId);
-        if (!messages.has(skey)) messages.set(skey, []);
-        messages.get(skey).push(sm);
-        scheduleSave();
-        console.log('⭐ Перевод: ' + (sender && sender.name) + ' → ' + rcpt.name + ': ' + amount);
-        send({ type:'stars_sent', toId, toName: rcpt.name, amount, message: sm, balance: starsOf(userId) });
-        if (isSocketOpen(rcpt.ws)) {
-          safeSend(rcpt.ws, { type:'message', chatWith:userId, message: { ...sm, fromName: sender && sender.name } });
-          safeSend(rcpt.ws, { type:'stars_received', fromId:userId, fromName: sender ? sender.name : '', amount, balance: starsOf(toId) });
-          safeSend(rcpt.ws, { type:'new_message_notify', fromId:userId, fromName: sender && sender.name, text:'⭐ ' + amount.toLocaleString('ru-RU') + ' звёзд' });
+        sendStarsTransfer(userId, String(msg.toId || ''), toInt(msg.amount), send);
+        break;
+      }
+
+      // ── Кошелёк ──
+      case 'wallet_get': {
+        if (!userId) break;
+        send(walletView(userId));
+        break;
+      }
+      case 'nsc_buy':
+      case 'nsc_sell': {
+        if (!userId) break;
+        const n = toInt(msg.amount);
+        const fail = text => send({ type:'wallet_error', text });
+        if (!n) { fail('Введите количество NSC'); break; }
+        if (n > NSC_MAX_OP) { fail('За один раз — не больше ' + NSC_MAX_OP.toLocaleString('ru-RU') + ' NSC'); break; }
+        if (msg.type === 'nsc_buy') {
+          const cost = n * NSC_BUY;
+          if (!trySpendStars(userId, cost)) { fail('Недостаточно звёзд: нужно ' + cost.toLocaleString('ru-RU') + ' ⭐'); break; }
+          userNsc.set(userId, nscOf(userId) + n);
+          addWalletTx(userId, { type:'buy', cur:'nsc', amount:n, stars:cost });
+        } else {
+          if (nscOf(userId) < n) { fail('У вас нет столько NSC'); break; }
+          const pay = n * NSC_SELL;
+          userNsc.set(userId, nscOf(userId) - n);
+          addStarsTo(userId, pay);
+          addWalletTx(userId, { type:'sell', cur:'nsc', amount:n, stars:pay });
         }
-        pushNotify(toId, { ...pushItemFor(toId, userId, sm), text:'⭐ Вам перевели ' + amount.toLocaleString('ru-RU') + ' звёзд' });
+        scheduleSave();
+        send(starsSyncMsg(userId));
+        send({ ...walletView(userId), ok: msg.type === 'nsc_buy' ? 'buy' : 'sell', amount:n });
+        break;
+      }
+      case 'wallet_send': {
+        if (!userId) break;
+        const fail = text => send({ type:'wallet_error', text });
+        const rcpt = findUserByRef(msg.to);
+        const amount = toInt(msg.amount);
+        if (!rcpt || rcpt.id === userId || rcpt.id.startsWith('bot_')) { fail('Получатель не найден'); break; }
+        if (!amount) { fail('Введите сумму'); break; }
+        if (msg.currency === 'stars') {
+          if (sendStarsTransfer(userId, rcpt.id, amount, send)) send(walletView(userId));
+          else send({ type:'wallet_error', text:null });
+          break;
+        }
+        if (nscOf(userId) < amount) { fail('Недостаточно NSC'); break; }
+        const sender = users.get(userId);
+        userNsc.set(userId, nscOf(userId) - amount);
+        userNsc.set(rcpt.id, nscOf(rcpt.id) + amount);
+        addWalletTx(userId,  { type:'send', cur:'nsc', amount, peer: rcpt.name || '' });
+        addWalletTx(rcpt.id, { type:'recv', cur:'nsc', amount, peer: sender ? sender.name : '' });
+        scheduleSave();
+        console.log('🪙 NSC: ' + (sender && sender.name) + ' → ' + rcpt.name + ': ' + amount);
+        send({ ...walletView(userId), ok:'send', amount, cur:'nsc', toName: rcpt.name });
+        if (isSocketOpen(rcpt.ws)) safeSend(rcpt.ws, { ...walletView(rcpt.id), notify:{ cur:'nsc', amount, fromName: sender ? sender.name : '' } });
+        pushNotify(rcpt.id, { id:genId(), chatId:userId, title:'Кошелёк', text:'🪙 Вам перевели ' + amount.toLocaleString('ru-RU') + ' NSC' });
         break;
       }
 
