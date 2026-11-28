@@ -2397,6 +2397,25 @@ html.dark .wlt-tx+.wlt-tx{border-top-color:rgba(255,255,255,.06)}
 .wlt-tx .wlt-mid b{font-size:16px}
 .wlt-tx .wlt-right{font-size:16px}
 .wlt-empty{padding:22px 16px;text-align:center;color:var(--text2);font-size:14px}
+.wlt-dep{padding:12px 16px}
+.wlt-dep+.wlt-dep,.wlt-dep+.wlt-depnew{border-top:1px solid var(--border)}
+html.dark .wlt-dep+.wlt-dep,html.dark .wlt-dep+.wlt-depnew{border-top-color:rgba(255,255,255,.06)}
+.wlt-dep-top{display:flex;align-items:center;gap:12px}
+.wlt-dep-top .wlt-ico{width:40px;height:40px;background:linear-gradient(135deg,#f7b500,#f08a00)}
+.wlt-dep-top .wlt-ico svg{width:20px;height:20px}
+.wlt-bar{height:6px;border-radius:3px;background:var(--bg2);overflow:hidden;margin:10px 0 8px}
+.wlt-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#f7b500,#1fa868)}
+.wlt-dep-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--text2)}
+.wlt-dep-foot button{border:0;background:var(--accent-light);color:var(--accent);font:500 13px "Roboto",sans-serif;padding:6px 12px;border-radius:14px;cursor:pointer}
+.wlt-dep-foot button.ready{background:#1fa868;color:#fff}
+.wlt-depnew{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;color:var(--accent);font:500 15px "Roboto",sans-serif;cursor:pointer}
+.wlt-plans{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.wlt-plan{border:1.5px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer;color:var(--text);font-family:"Roboto",sans-serif}
+html.dark .wlt-plan{border-color:rgba(255,255,255,.1)}
+.wlt-plan b{display:block;font-size:15px;font-weight:600}
+.wlt-plan span{display:block;font-size:20px;font-weight:700;color:#1fa868;margin-top:2px}
+.wlt-plan small{display:block;font-size:11.5px;color:var(--text2);margin-top:2px}
+.wlt-plan.on{border-color:var(--accent);background:var(--accent-light)}
 /* нижние окна: обмен и перевод */
 .wlt-sheet{position:fixed;inset:0;z-index:806;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.42)}
 .wlt-sheet.open{display:flex}
@@ -10747,7 +10766,10 @@ const W_ICO = {
   recv:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
   swap:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>',
+  lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
 };
+const W_PCT = r => (Math.round(r * 1000) / 10).toLocaleString('ru-RU') + '%';
 function wStarsTxt(d) { return d && d.unlim ? '∞' : wN(d ? d.stars : starBalance); }
 
 function openWallet() {
@@ -10791,6 +10813,12 @@ function walletOnData(d) {
     if (d.ok === 'buy') showToast('Кошелёк', `🪙 Куплено ${wN(d.amount)} NSC`, 'logo', '#34c759');
     else if (d.ok === 'sell') showToast('Кошелёк', `🪙 Продано ${wN(d.amount)} NSC`, 'logo', '#34c759');
     else if (d.ok === 'send') showToast('Кошелёк', `🪙 ${wN(d.amount)} NSC → ${d.toName || 'пользователь'}`, 'logo', '#34c759');
+    else if (d.ok === 'dep_open') showToast('Вклад открыт', `🔒 ${wN(d.amount)} NSC на ${d.days} дн. — в конце +${wN(d.profit)} NSC`, 'logo', '#34c759');
+    else if (d.ok === 'dep_close') showToast('Вклад закрыт', `🪙 ${wN(d.amount)} NSC вернулись на баланс (без процентов)`, 'logo', '#7a3cf0');
+  }
+  if (d.depositDone && d.depositDone.length) {
+    const s = d.depositDone.reduce((n, p) => n + p.profit, 0);
+    showToast('Вклад завершён', `🪙 Начислено ${wN(d.depositDone.reduce((n, p) => n + p.amount + p.profit, 0))} NSC (из них +${wN(s)} процентами)`, 'logo', '#34c759');
   }
   if (d.notify) showToast('Вам перевели NSC', `🪙 +${wN(d.notify.amount)} NSC от ${d.notify.fromName || 'пользователя'}`, 'logo', '#34c759');
   if (WLT.busy && WLT.sheet === 'send' && WLT.cur === 'stars') { WLT.busy = false; closeWalletSheet(); showToast('Кошелёк', '⭐ Звёзды отправлены', 'logo', '#34c759'); }
@@ -10808,6 +10836,9 @@ function wTxRow(t) {
   let ico = 'send', cls = '', title = '', amt = '', sub = '';
   if (t.type === 'buy')       { ico = 'swap'; cls = 'ex'; title = 'Покупка NSC';  amt = '+' + wN(t.amount) + ' NSC'; sub = '−' + wN(t.stars) + ' ⭐'; }
   else if (t.type === 'sell') { ico = 'swap'; cls = 'ex'; title = 'Продажа NSC';  amt = '−' + wN(t.amount) + ' NSC'; sub = '+' + wN(t.stars) + ' ⭐'; }
+  else if (t.type === 'dep_open')  { ico = 'lock'; cls = 'ex'; title = 'Вклад на ' + t.days + ' дн.'; amt = '−' + wN(t.amount) + ' NSC'; sub = 'под ' + W_PCT(t.rate || 0); }
+  else if (t.type === 'dep_done')  { ico = 'recv'; cls = 'in'; title = 'Вклад завершён'; amt = '+' + wN(t.amount) + ' NSC'; sub = 'проценты +' + wN(t.profit || 0); }
+  else if (t.type === 'dep_close') { ico = 'recv'; cls = 'ex'; title = 'Вклад закрыт досрочно'; amt = '+' + wN(t.amount) + ' NSC'; sub = 'без процентов'; }
   else if (t.type === 'recv') { ico = 'recv'; cls = 'in'; title = 'Получено: ' + wEsc(t.peer || 'пользователь'); amt = '+' + wN(t.amount) + unit; sub = 'Получено'; }
   else                        { title = 'Перевод: ' + wEsc(t.peer || 'пользователь'); amt = '−' + wN(t.amount) + unit; sub = 'Отправлено'; }
   const when = new Date(t.ts).toLocaleString('ru-RU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
@@ -10817,7 +10848,7 @@ function renderWalletPage() {
   const body = document.getElementById('walletBody'); if (!body) return;
   const d = WLT.data;
   const total = d ? (d.unlim ? '∞' : wN(d.total)) : '…';
-  const nsc = d ? d.nsc : 0, sell = d ? d.nscSell : 100, buy = d ? d.nscBuy : 105;
+  const nsc = d ? d.nsc : 0, sell = d ? d.nscSell : 100, buy = d ? d.nscBuy : 100;
   const ch = d ? Number(d.vlpChange) || 0 : 0;
   const chTxt = (ch > 0 ? '+' : ch < 0 ? '−' : '') + Math.abs(ch).toFixed(2) + '%';
   wDestroyLot();
@@ -10834,9 +10865,10 @@ function renderWalletPage() {
     </div>
     <div class="wlt-card" onclick="openWalletSheet('swap')">
       <div class="wlt-ico nsc"><div class="wlt-lot"></div></div>
-      <div class="wlt-mid"><b>NSC <em>стейблкоин</em></b><small>${wN(nsc)} NSC</small></div>
-      <div class="wlt-right">${wN(nsc * sell)} ⭐<small>1 NSC = ${sell}–${buy} ⭐</small></div>
+      <div class="wlt-mid"><b>NSC <em>стейблкоин</em></b><small>${wN(nsc)} NSC${d && d.nscDep ? ' · ' + wN(d.nscDep) + ' во вкладах' : ''}</small></div>
+      <div class="wlt-right">${wN((nsc + (d ? d.nscDep || 0 : 0)) * sell)} ⭐<small>1 NSC = ${sell === buy ? sell : sell + '–' + buy} ⭐</small></div>
     </div>
+    ${wDepositsHtml(d)}
     <div class="wlt-card" onclick="closeWallet();openStars()">
       <div class="wlt-ico star"><img src="${STAR_IMG}" alt="⭐" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'⭐'}))"></div>
       <div class="wlt-mid"><b>Звёзды</b><small>${wStarsTxt(d)} ⭐</small></div>
@@ -10857,10 +10889,48 @@ function renderWalletPage() {
   wMountCoins(body);
 }
 
+// ── вклады NSC ──
+function wDepositsHtml(d) {
+  if (!d) return '';
+  const rows = (d.deposits || []).map(dp => {
+    const total = dp.end - dp.start, done = Math.min(1, Math.max(0, (Date.now() - dp.start) / total)), ready = Date.now() >= dp.end;
+    const till = new Date(dp.end).toLocaleString('ru-RU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    return `<div class="wlt-dep"><div class="wlt-dep-top"><div class="wlt-ico">${W_ICO.lock}</div>
+        <div class="wlt-mid"><b>Вклад на ${dp.days} дн.</b><small>под ${W_PCT(dp.rate)} · до ${till}</small></div>
+        <div class="wlt-right">${wN(dp.amount)} NSC<small style="color:#1fa868">+${wN(dp.profit)} NSC</small></div></div>
+      <div class="wlt-bar"><i style="width:${(done * 100).toFixed(1)}%"></i></div>
+      <div class="wlt-dep-foot"><span>${ready ? 'Срок вышел — проценты начислены' : 'Осталось ' + wLeft(dp.end - Date.now())}</span>
+        <button class="${ready ? 'ready' : ''}" onclick="wDepClose('${wEsc(dp.id)}',${ready ? 1 : 0})">${ready ? 'Получить' : 'Забрать досрочно'}</button></div></div>`;
+  }).join('');
+  return `<div class="wlt-h">Вклады NSC</div><div class="wlt-list" style="margin-bottom:10px">${rows}
+    <div class="wlt-depnew" onclick="openWalletSheet('deposit')">${W_ICO.plus} Открыть вклад — до ${W_PCT(Math.max(...(d.plans || [{ rate:0.2 }]).map(p => p.rate)))}</div></div>`;
+}
+function wLeft(ms) {
+  const m = Math.max(0, Math.floor(ms / 60000)), dd = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mi = m % 60;
+  return dd ? dd + ' дн. ' + h + ' ч' : h ? h + ' ч ' + mi + ' мин' : mi + ' мин';
+}
+function wDepClose(id, ready) {
+  if (!ready && !confirm('Забрать вклад досрочно? NSC вернутся на баланс, но проценты сгорят.')) return;
+  wsSend({ type:'nsc_deposit_close', id });
+}
+function wDepInput() {
+  const n = wAmt(), d = WLT.data || {}, sum = document.getElementById('wSum'); if (!sum) return;
+  document.getElementById('wErr').textContent = '';
+  const plan = (d.plans || []).find(p => p.id === WLT.plan); if (!plan) return;
+  if (!n) { sum.innerHTML = `NSC на балансе: <b>${wN(d.nsc || 0)}</b>`; return; }
+  sum.innerHTML = `Через ${plan.days} дн. получите <b>${wN(n + Math.floor(n * plan.rate))} NSC</b> (+${wN(Math.floor(n * plan.rate))})`;
+}
+function wDepGo() {
+  const n = wAmt(); if (!n) { document.getElementById('wErr').textContent = 'Введите количество NSC'; return; }
+  WLT.busy = true; document.getElementById('wGo').disabled = true;
+  wsSend({ type:'nsc_deposit', amount:n, plan:WLT.plan });
+}
+
 // ── нижние окна ──
 function openWalletSheet(kind, opt) {
   WLT.sheet = kind; WLT.busy = false;
   if (kind === 'swap') WLT.mode = (opt && opt.mode) || 'buy';
+  if (kind === 'deposit') WLT.plan = WLT.plan || 'd7';
   if (kind === 'send') { WLT.cur = (opt && opt.cur) || WLT.cur || 'stars'; WLT.to = ''; WLT.toName = ''; }
   document.getElementById('walletSheet').classList.add('open');
   renderWalletSheet();
@@ -10878,13 +10948,13 @@ function wRecentUsers() {
 function renderWalletSheet() {
   const pane = document.getElementById('walletPane'); if (!pane) return;
   const d = WLT.data || {};
-  const sell = d.nscSell || 100, buy = d.nscBuy || 105;
+  const sell = d.nscSell || 100, buy = d.nscBuy || 100;
   if (WLT.sheet === 'swap') {
     const isBuy = WLT.mode === 'buy';
     pane.innerHTML = `<div class="wlt-grab"></div>
       <div class="wlt-coin wlt-lot"></div>
       <h3>${isBuy ? 'Купить NSC' : 'Продать NSC'}</h3>
-      <div class="wlt-sub">NSC — стабильный коин Нефграма: курс не меняется.<br>Покупка ${buy} ⭐ · продажа ${sell} ⭐ за 1 NSC</div>
+      <div class="wlt-sub">NSC — стабильный коин Нефграма: курс не меняется.<br>${sell === buy ? '1 NSC = ' + sell + ' ⭐' : 'Покупка ' + buy + ' ⭐ · продажа ' + sell + ' ⭐ за 1 NSC'}</div>
       <div class="wlt-seg"><button class="${isBuy ? 'on' : ''}" onclick="WLT.mode='buy';renderWalletSheet()">Купить</button><button class="${isBuy ? '' : 'on'}" onclick="WLT.mode='sell';renderWalletSheet()">Продать</button></div>
       <div class="wlt-field big"><input id="wAmt" inputmode="numeric" placeholder="0" oninput="wSwapInput()"><span>NSC</span></div>
       <div class="wlt-quick"><button onclick="wQuick(1)">1</button><button onclick="wQuick(10)">10</button><button onclick="wQuick(100)">100</button><button onclick="wQuick('max')">Макс</button></div>
@@ -10893,6 +10963,23 @@ function renderWalletSheet() {
       <button class="wlt-go" id="wGo" onclick="wSwapGo()">${isBuy ? 'Купить' : 'Продать'}</button>`;
     wMountCoins(pane);
     wSwapInput();
+  } else if (WLT.sheet === 'deposit') {
+    const plans = d.plans || [];
+    const room = Math.max(0, (d.depMax || 0) - (d.nscDep || 0));
+    pane.innerHTML = `<div class="wlt-grab"></div>
+      <div class="wlt-coin wlt-lot"></div>
+      <h3>Вклад NSC</h3>
+      <div class="wlt-sub">NSC замораживаются на срок и возвращаются с процентами.<br>Досрочно забрать можно, но без процентов. Во вкладах — до ${wN(d.depMax || 0)} NSC.</div>
+      <div class="wlt-plans">${plans.map(p => `<button class="wlt-plan${WLT.plan === p.id ? ' on' : ''}" onclick="WLT.plan='${p.id}';renderWalletSheet()"><b>${p.days} дн.</b><span>+${W_PCT(p.rate)}</span><small>${(Math.round(p.rate / p.days * 1000) / 10).toLocaleString('ru-RU')}% в день</small></button>`).join('')}</div>
+      <div class="wlt-field big"><input id="wAmt" inputmode="numeric" placeholder="0" oninput="wDepInput()"><span>NSC</span></div>
+      <div class="wlt-quick"><button onclick="wDepQuick(10)">10</button><button onclick="wDepQuick(100)">100</button><button onclick="wDepQuick(1000)">1000</button><button onclick="wDepQuick('max')">Макс</button></div>
+      <div class="wlt-sum" id="wSum"></div>
+      <div class="wlt-err" id="wErr"></div>
+      ${(d.nsc || 0) > 0 ? `<button class="wlt-go" id="wGo" onclick="wDepGo()">Открыть вклад</button>`
+        : `<button class="wlt-go" id="wGo" onclick="openWalletSheet('swap')">Сначала купите NSC</button>`}
+      ${room <= 0 ? '<div class="wlt-sum">Лимит вкладов заполнен</div>' : ''}`;
+    wMountCoins(pane);
+    wDepInput();
   } else if (WLT.sheet === 'send') {
     const isNsc = WLT.cur === 'nsc';
     const bal = isNsc ? wN(d.nsc || 0) + ' NSC' : (d.unlim || isStarsUnlimited ? '∞' : wN(d.stars ?? starBalance)) + ' ⭐';
@@ -10914,14 +11001,20 @@ function renderWalletSheet() {
 function wAmt() { const i = document.getElementById('wAmt'); if (!i) return 0; i.value = i.value.replace(/[^\d]/g, '').slice(0, 9); return parseInt(i.value, 10) || 0; }
 function wQuick(n) {
   const d = WLT.data || {}, i = document.getElementById('wAmt'); if (!i) return;
-  if (n === 'max') n = WLT.mode === 'buy' ? Math.floor((d.unlim ? 1e6 * (d.nscBuy || 105) : (d.stars || 0)) / (d.nscBuy || 105)) : (d.nsc || 0);
+  if (n === 'max') n = WLT.mode === 'buy' ? Math.floor((d.unlim ? 1e6 * (d.nscBuy || 100) : (d.stars || 0)) / (d.nscBuy || 100)) : (d.nsc || 0);
   i.value = Math.max(0, Math.min(n, 1000000)); wSwapInput();
+}
+function wDepQuick(n) {
+  const d = WLT.data || {}, i = document.getElementById('wAmt'); if (!i) return;
+  const room = Math.max(0, (d.depMax || 0) - (d.nscDep || 0));
+  if (n === 'max') n = Math.min(d.nsc || 0, room);
+  i.value = Math.max(0, n); wDepInput();
 }
 function wSwapInput() {
   const n = wAmt(), d = WLT.data || {}, sum = document.getElementById('wSum'); if (!sum) return;
   document.getElementById('wErr').textContent = '';
   if (!n) { sum.innerHTML = WLT.mode === 'buy' ? `Звёзд на счету: <b>${wStarsTxt(d)} ⭐</b>` : `NSC на счету: <b>${wN(d.nsc || 0)}</b>`; return; }
-  sum.innerHTML = WLT.mode === 'buy' ? `Спишется <b>${wN(n * (d.nscBuy || 105))} ⭐</b>` : `Вы получите <b>${wN(n * (d.nscSell || 100))} ⭐</b>`;
+  sum.innerHTML = WLT.mode === 'buy' ? `Спишется <b>${wN(n * (d.nscBuy || 100))} ⭐</b>` : `Вы получите <b>${wN(n * (d.nscSell || 100))} ⭐</b>`;
 }
 function wSwapGo() {
   const n = wAmt(); if (!n) { document.getElementById('wErr').textContent = 'Введите количество NSC'; return; }

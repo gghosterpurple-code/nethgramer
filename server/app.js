@@ -330,7 +330,7 @@ function gmBid(def, g) {
   const bid = gmSellPrice(g);
   return shopSells(def) ? Math.min(bid, Math.floor(def.price * GIFT_SELL_RATE)) : bid;
 }
-function giftBounds(def) { return [Math.max(1, def.price / 10), def.price * 20]; } // потолок ×20
+function giftBounds(def) { return [Math.max(1, def.price / 10), def.price * 100]; } // потолок ×100 — место для огромных пампов
 function ensureGiftMarket() {
   for (const d of GIFT_DEFS_TRADABLE()) if (!giftMarket.has(d.id)) giftMarket.set(d.id, { rate:d.price, prevRate:d.price, series:newSeries(d.price), stock:0 });
 }
@@ -409,13 +409,13 @@ function pumpTarget() { // во сколько раз вырастет: чаще
   if (r < 0.97) return rnd(1.25, 1.6);
   return rnd(1.6, 2.2);
 }
-// Подарки: чаще ×1.1–1.4, иногда ×1.4–2, совсем редко ×2–3
-const GIFT_PUMP = { chanceMul: 0.8 };   // пампы на подарках чуть реже обычного
+// Подарки: огромные пампы — часто ×2–5, часто ×5–15, иногда ×15–50
+const GIFT_PUMP = { chanceMul: 1.5, ticks: [6, 24] };   // в 1,5 раза чаще обычного, рост 1,5–6 минут
 function giftPumpTarget() {
   const r = Math.random();
-  if (r < 0.7) return rnd(1.1, 1.4);
-  if (r < 0.95) return rnd(1.4, 2);
-  return rnd(2, 3);
+  if (r < 0.4) return rnd(2, 5);
+  if (r < 0.8) return rnd(5, 15);
+  return rnd(15, 50);
 }
 function startEvent(m, kind, mult, ticks) {
   m.ev = { kind, ticksLeft: ticks, perTick: Math.pow(mult, 1 / ticks), from: m.rate };
@@ -442,7 +442,8 @@ function stepRate(m, base, min, max, scale, o) {
     m.pendingDump = null; started = 'dump';
     nr = rate;
   } else if (Math.random() < MKT.pumpChance * scale * (o.pumpMul || 1)) {
-    startEvent(m, 'pump', (o.pumpTarget || pumpTarget)(), Math.floor(rnd(3, 10)));   // 45 с – 2,5 мин роста
+    const pt = o.pumpTicks || [3, 10];   // по умолчанию 45 с – 2,5 мин роста
+    startEvent(m, 'pump', (o.pumpTarget || pumpTarget)(), Math.floor(rnd(pt[0], pt[1])));
     started = 'pump'; nr = rate;
   } else if (Math.random() < MKT.crashChance * scale) {
     startEvent(m, 'crash', rnd(0.15, 0.65), Math.floor(rnd(2, 12)));  // −35…−85% за 0,5–3 минуты
@@ -459,12 +460,14 @@ function stepRate(m, base, min, max, scale, o) {
   m.rate = r2(Math.min(max, Math.max(min, nr)));
   return { rate: m.rate, started, ended };
 }
+const PUMP_NEWS = { start: 0.3, end: 0.5 }; // с какой вероятностью о пампе выходит новость: на старте / по итогам
 function eventNews(name, target, res, prevRate) {
-  if (res.started === 'crash') addNews('🚨 ПАНИКА', name + ': начинается обвал, все бегут к выходу.', target, pct(prevRate, res.rate));
+  if (res.started === 'pump' && Math.random() < PUMP_NEWS.start) addNews('🔥 АЖИОТАЖ', name + ': похоже, начинается памп! Покупатели сметают всё.', target, pct(prevRate, res.rate));
+  else if (res.started === 'crash') addNews('🚨 ПАНИКА', name + ': начинается обвал, все бегут к выходу.', target, pct(prevRate, res.rate));
   else if (res.started === 'dump') addNews('📉 ФИКСАЦИЯ ПРИБЫЛИ', name + ': киты сливают после пампа.', target, pct(prevRate, res.rate));
   if (res.ended) {
     const k = res.rate / res.ended.from, total = pct(res.ended.from, res.rate);
-    if (k >= 1) addNews('🚀 ПАМП ЗАВЕРШЁН', name + ' вырос в ' + (Math.round(k * 10) / 10).toLocaleString('ru-RU') + ' раза!', target, total);
+    if (k >= 1) { if (Math.random() < PUMP_NEWS.end) addNews('🚀 ПАМП ЗАВЕРШЁН', name + ' вырос в ' + (Math.round(k * 10) / 10).toLocaleString('ru-RU') + ' раза!', target, total); }
     else addNews('💥 ОБВАЛ', name + ' упал на ' + Math.round((1 - k) * 100) + '%.', target, total);
   }
 }
@@ -508,7 +511,7 @@ function tickMarket() {
       const g = giftMarket.get(def.id); if (!g) continue;
       const [mn, mx] = giftBounds(def);
       g.prevRate = g.rate;
-      const s = stepRate(g, def.price, mn, mx, 0.7, { pumpMul:GIFT_PUMP.chanceMul, pumpTarget:giftPumpTarget });
+      const s = stepRate(g, def.price, mn, mx, 0.7, { pumpMul:GIFT_PUMP.chanceMul, pumpTarget:giftPumpTarget, pumpTicks:GIFT_PUMP.ticks });
       seriesPush(g.series, s.rate, now);
       eventNews('🎁 ' + def.name, 'gift_' + def.id, s, g.prevRate);
     }
@@ -608,8 +611,8 @@ function meView(uid) {
   return { vlp:rec.balance, locked, stars:userStars.get(uid) || 0, boughtToday:sharedVlpDaily(), myBoughtToday:rec.boughtToday, dailyLimit:VLP_DAILY_LIMIT,
            valueStars, pnl, basis:Math.round(basis), pnlPct: basis > 0 ? r2((pnl / basis) * 100) : 0 };
 }
-// ── NSC — второй коин Нефграма. Стейблкоин: курс не меняется — купить 1 NSC = 105 ⭐, продать 1 NSC = 100 ⭐ ──
-const NSC_BUY  = 105;
+// ── NSC — второй коин Нефграма. Стейблкоин: фиксированный курс 1 NSC = 100 ⭐ (и купить, и продать) ──
+const NSC_BUY  = 100;
 const NSC_SELL = 100;
 const NSC_MAX_OP = 1000000;
 const userNsc  = new Map(); // userId -> баланс NSC
@@ -620,6 +623,45 @@ function addWalletTx(uid, t) {
   const arr = walletTx.get(uid); arr.push({ ...t, ts:Date.now() });
   if (arr.length > 100) arr.splice(0, arr.length - 100);
 }
+// ── Вклады NSC под проценты: NSC замораживаются на срок, в конце возвращаются с процентами ──
+const NSC_DEPOSIT_PLANS = [
+  { id:'d3',  days:3,  rate:0.015, name:'3 дня'  },
+  { id:'d7',  days:7,  rate:0.04,  name:'7 дней' },
+  { id:'d30', days:30, rate:0.20,  name:'30 дней' },
+];
+const NSC_DEPOSIT_MAX = 5000;    // сколько NSC всего можно держать во вкладах одному человеку
+const nscDeposits = new Map();   // userId -> [{id, amount, plan, days, rate, start, end}]
+const depositsOf = uid => nscDeposits.get(uid) || [];
+const depositProfit = dp => Math.floor(dp.amount * dp.rate);
+const depositLocked = uid => depositsOf(uid).reduce((n, dp) => n + dp.amount, 0);
+/** Выплатить вклады, у которых закончился срок. Возвращает список выплаченных. */
+function payMaturedDeposits(uid) {
+  const list = depositsOf(uid), now = Date.now(), paid = [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const dp = list[i];
+    if (dp.end > now) continue;
+    const profit = depositProfit(dp);
+    userNsc.set(uid, nscOf(uid) + dp.amount + profit);
+    addWalletTx(uid, { type:'dep_done', cur:'nsc', amount: dp.amount + profit, profit, days: dp.days });
+    list.splice(i, 1); paid.push({ ...dp, profit });
+  }
+  if (!list.length) nscDeposits.delete(uid);
+  return paid;
+}
+function checkDeposits() {
+  try {
+    let any = false;
+    for (const uid of [...nscDeposits.keys()]) {
+      const paid = payMaturedDeposits(uid);
+      if (!paid.length) continue;
+      any = true;
+      const u = users.get(uid);
+      if (u && isSocketOpen(u.ws)) safeSend(u.ws, { ...walletView(uid), depositDone: paid.map(p => ({ amount:p.amount, profit:p.profit, days:p.days })) });
+    }
+    if (any) scheduleSave();
+  } catch (e) { console.error('deposits error:', e.message); }
+}
+
 /** Всё, что есть у пользователя, в звёздах: звёзды + NSC + $VLP по курсу + вложения в активы */
 function userWorth(uid) {
   const stars = starsOf(uid), unlim = stars >= UNLIMITED_STARS;
@@ -630,12 +672,13 @@ function userWorth(uid) {
     const v = posValue(p, a.rate);
     inv += p.currency === 'vlp' ? v * velosipe.rate : v;
   }
-  const nsc = nscOf(uid), vlpStars = vlp * velosipe.rate, nscStars = nsc * NSC_SELL;
-  return { stars, unlim, vlp, vlpStars, inv, nsc, nscStars, total: (unlim ? 0 : stars) + vlpStars + inv + nscStars };
+  const nscDep = depositLocked(uid), nsc = nscOf(uid) + nscDep, vlpStars = vlp * velosipe.rate, nscStars = nsc * NSC_SELL;
+  return { stars, unlim, vlp, vlpStars, inv, nsc, nscDep, nscStars, total: (unlim ? 0 : stars) + vlpStars + inv + nscStars };
 }
 function walletView(uid) {
   const w = userWorth(uid);
-  return { type:'wallet', stars:w.stars, unlim:w.unlim, nsc:w.nsc, vlp:w.vlp, vlpRate:velosipe.rate,
+  return { type:'wallet', stars:w.stars, unlim:w.unlim, nsc:w.nsc - w.nscDep, nscDep:w.nscDep, vlp:w.vlp, vlpRate:velosipe.rate,
+           deposits: depositsOf(uid).map(dp => ({ ...dp, profit: depositProfit(dp) })), plans: NSC_DEPOSIT_PLANS, depMax: NSC_DEPOSIT_MAX, now: Date.now(),
            vlpChange:pct(velosipe.prevRate, velosipe.rate), vlpStars:Math.floor(w.vlpStars), invest:Math.floor(w.inv),
            total:Math.floor(w.total), nscBuy:NSC_BUY, nscSell:NSC_SELL, tx:(walletTx.get(uid) || []).slice(-50).reverse() };
 }
@@ -689,14 +732,14 @@ function releaseUserVelosipe(uid) { // при удалении аккаунта 
   const held = (rec ? rec.balance : 0) + positionsOf(uid).filter(p => p.currency === 'vlp').reduce((s, p) => s + p.cost, 0);
   velosipe.available = Math.min(VLP_TOTAL_SUPPLY, velosipe.available + held);
   userVelosipe.delete(uid); velosipeTrades.delete(uid); userPositions.delete(uid);
-  userNsc.delete(uid); walletTx.delete(uid);
+  userNsc.delete(uid); walletTx.delete(uid); nscDeposits.delete(uid);
 }
 
 function serializeVelosipe() {
   const mapObj = m => { const o = {}; for (const [k, v] of m) o[k] = v; return o; };
   const assets = {}; for (const [id, a] of assetsMarket) assets[id] = a;
   return { market:velosipe, users:mapObj(userVelosipe), trades:mapObj(velosipeTrades), positions:mapObj(userPositions), assets, news:marketNews,
-           giftMarket:mapObj(giftMarket), nftListings, assetScaleVer, nsc:mapObj(userNsc), walletTx:mapObj(walletTx) };
+           giftMarket:mapObj(giftMarket), nftListings, assetScaleVer, nsc:mapObj(userNsc), walletTx:mapObj(walletTx), nscDeposits:mapObj(nscDeposits) };
 }
 function loadVelosipe(d) {
   if (!d) return;
@@ -710,6 +753,7 @@ function loadVelosipe(d) {
   if (Array.isArray(d.nftListings)) { nftListings.length = 0; nftListings.push(...d.nftListings); }
   for (const [k, v] of Object.entries(d.nsc || {})) { const n = Number(v); if (Number.isFinite(n) && n > 0) userNsc.set(k, Math.floor(n)); }
   for (const [k, v] of Object.entries(d.walletTx || {})) if (Array.isArray(v)) walletTx.set(k, v);
+  for (const [k, v] of Object.entries(d.nscDeposits || {})) if (Array.isArray(v) && v.length) nscDeposits.set(k, v);
   assetScaleVer = Number(d.assetScaleVer) || (d.assets ? 1 : ASSET_SCALE_VER); // старая база без метки — пересчитать
   migrateAssetScale();
   ensureGiftMarket();
@@ -1176,6 +1220,7 @@ function ensureNewsChannel() {
 setInterval(saveNow, 30000);
 setInterval(tickMarket, VLP_TICK_MS);
 setInterval(checkGiftRestock, 60e3);
+setInterval(checkDeposits, 60e3);
 setTimeout(checkGiftRestock, 5e3);
 setInterval(randomNewsEvent, VLP_NEWS_MS);
 let shuttingDown = false;
@@ -1476,12 +1521,14 @@ function handleNethgramBot(text, userId, userAdminAuthorized) {
     if (t.substring(3).trim().toLowerCase() !== 'да') {
       let withMoney = 0;
       for (const u of users.values()) { const w = userWorth(u.id); if (w.stars > 0 || w.nsc > 0 || w.vlp > 0 || w.inv > 0) withMoney++; }
-      return { text: '⚠️ Это обнулит у ВСЕХ пользователей (' + withMoney + ' с деньгами) всю валюту: звёзды (включая бесконечные), NSC, $VLP и все вложения в активы и акции. Подарки и NFT останутся.\n\nОтменить нельзя. Для подтверждения отправьте: ' + cmdName + ' да' };
+      return { text: '⚠️ Это обнулит у ВСЕХ пользователей (' + withMoney + ' с деньгами) всю валюту: звёзды (включая бесконечные), NSC (и вклады), $VLP и все вложения в активы и акции. Подарки и NFT останутся.\n\nОтменить нельзя. Для подтверждения отправьте: ' + cmdName + ' да' };
     }
     const touched = new Set();
     for (const [uid, b] of userStars) if (b !== 0) { userStars.set(uid, 0); touched.add(uid); }
     for (const [uid, n] of userNsc) if (n) touched.add(uid);
     userNsc.clear();
+    for (const uid of nscDeposits.keys()) touched.add(uid);
+    nscDeposits.clear();
     for (const [uid, rec] of userVelosipe) { if (rec.balance) touched.add(uid); rec.balance = 0; rec.basis = 0; }
     for (const [uid, list] of userPositions) if (list.length) touched.add(uid);
     userPositions.clear();
@@ -3133,7 +3180,49 @@ server.on('upgrade', (req, socket) => {
       // ── Кошелёк ──
       case 'wallet_get': {
         if (!userId) break;
+        if (payMaturedDeposits(userId).length) scheduleSave();
         send(walletView(userId));
+        break;
+      }
+      // Открыть вклад NSC
+      case 'nsc_deposit': {
+        if (!userId) break;
+        const fail = text => send({ type:'wallet_error', text });
+        const plan = NSC_DEPOSIT_PLANS.find(p => p.id === msg.plan);
+        const n = toInt(msg.amount);
+        if (!plan) { fail('Выберите срок вклада'); break; }
+        if (!n) { fail('Введите количество NSC'); break; }
+        if (nscOf(userId) < n) { fail('У вас нет столько NSC'); break; }
+        const room = NSC_DEPOSIT_MAX - depositLocked(userId);
+        if (n > room) { fail('Во вкладах можно держать до ' + NSC_DEPOSIT_MAX.toLocaleString('ru-RU') + ' NSC. ' + (room > 0 ? 'Можно добавить ещё ' + room.toLocaleString('ru-RU') + ' NSC' : 'Лимит заполнен')); break; }
+        const now = Date.now();
+        const dp = { id:genId(), amount:n, plan:plan.id, days:plan.days, rate:plan.rate, start:now, end: now + plan.days * 86400e3 };
+        userNsc.set(userId, nscOf(userId) - n);
+        if (!nscDeposits.has(userId)) nscDeposits.set(userId, []);
+        nscDeposits.get(userId).push(dp);
+        addWalletTx(userId, { type:'dep_open', cur:'nsc', amount:n, days:plan.days, rate:plan.rate });
+        scheduleSave();
+        send({ ...walletView(userId), ok:'dep_open', amount:n, profit: depositProfit(dp), days:plan.days });
+        break;
+      }
+      // Забрать вклад (досрочно — без процентов)
+      case 'nsc_deposit_close': {
+        if (!userId) break;
+        const list = depositsOf(userId), idx = list.findIndex(dp => dp.id === String(msg.id || ''));
+        if (idx < 0) { send({ type:'wallet_error', text:'Вклад не найден' }); break; }
+        if (list[idx].end <= Date.now()) {
+          const paid = payMaturedDeposits(userId);
+          scheduleSave();
+          send({ ...walletView(userId), depositDone: paid.map(p => ({ amount:p.amount, profit:p.profit, days:p.days })) });
+          break;
+        }
+        const dp = list[idx];
+        list.splice(idx, 1);
+        if (!list.length) nscDeposits.delete(userId);
+        userNsc.set(userId, nscOf(userId) + dp.amount);
+        addWalletTx(userId, { type:'dep_close', cur:'nsc', amount:dp.amount, days:dp.days });
+        scheduleSave();
+        send({ ...walletView(userId), ok:'dep_close', amount:dp.amount });
         break;
       }
       case 'nsc_buy':
