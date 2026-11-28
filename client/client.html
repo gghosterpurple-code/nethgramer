@@ -2556,6 +2556,19 @@ html.dark .menu-prof .menu-theme-toggle:after{background-image:url("data:image/s
 .st-slider .scale-value-badge{background:none;color:#3390ec;font-size:13px;padding:0;min-width:40px;text-align:right}
 .st-group .wallpaper-grid{padding:6px 22px 14px}
 .settings-section-title{font-weight:500}
+.st-chev{color:#999;font-size:20px;transition:transform .2s}
+.st-chev.open{transform:rotate(90deg)}
+.st-priv{display:none;padding-bottom:10px}
+.st-priv.open{display:block}
+.st-tgl{position:relative;width:40px;height:22px;border-radius:22px;background:#ccc;flex-shrink:0;transition:background .2s;cursor:pointer}
+.st-tgl::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}
+.st-tgl.on{background:#3390ec}
+.st-tgl.on::after{left:21px}
+.st-priv-hint{font-size:13px;color:#8a8a8a;padding:0 22px 8px 68px;line-height:1.35}
+.st-priv-input{padding:0 22px 4px 68px}
+.st-priv-input input{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid rgba(128,128,128,.35);border-radius:10px;background:transparent;color:inherit;font-size:14px;outline:none}
+.st-priv-input input:focus{border-color:#3390ec}
+.st-priv-input input:disabled{opacity:.5}
 
 /* ===== CONTACT PROFILE (Telegram Desktop card) ===== */
 .contact-profile-overlay{align-items:center;justify-content:center}
@@ -4737,6 +4750,7 @@ function handleWS(msg) {
       break;
     }
 
+    case 'nft_lookup_result': handleNftLookupResult(msg); break;
     case 'user_gifts': {
       // Full gifts list from server for a user's profile.
       // Merge carefully: keep any NFT entries that we already have locally
@@ -5815,7 +5829,7 @@ function doSend(c) {
     // Find gift by id or name (case-insensitive)
     const giftQuery = parts[0].toLowerCase();
     const countRaw = parseInt(parts[1]);
-    const comment = parts.slice(2).join(' ');
+    const comment = parts.slice(2).join(' ') || autoSignText();
 
     const foundGift = GIFTS.find(g =>
       g.id.toLowerCase() === giftQuery ||
@@ -7383,7 +7397,7 @@ function openGiftConfirm(gift) {
     sendBtn.textContent = `Отправить подарок`;
   }
 
-  document.getElementById('gcMessage').value = '';
+  document.getElementById('gcMessage').value = autoSignText();
 
   // Generate sparkles
   const sp = document.getElementById('gcSparkles');
@@ -7417,7 +7431,7 @@ function closeGiftConfirm() {
 
 function sendGift() {
   if (!confirmGift || !myUser) return;
-  const msg = document.getElementById('gcMessage').value.trim();
+  const msg = document.getElementById('gcMessage').value.trim() || autoSignText();
   if (starBalance < confirmGift.price) { showToast('Ошибка', 'Недостаточно звёзд!', 'logo', '#e74c3c'); return; }
 
   // Double-check stock
@@ -7684,6 +7698,7 @@ let giftViewCurrentGift = null; // the gift entry currently shown in view modal
 
 const giftMsgMap = {};
 
+let giftViewOwner = null;      // владелец NFT, если подарок открыт по ссылке nethgram/nft/...
 let giftViewChannelId = null;  // id канала/группы, если открыт подарок канала
 function canManageChannelGiftsUi(channelId) {
   const c = contacts.get(channelId);
@@ -7694,6 +7709,7 @@ function openGiftView(msgId, giftEntry, ctx) {
   const data = giftMsgMap[msgId];
   if (!data && !giftEntry) return;
   giftViewChannelId = (ctx && ctx.channelId) || null;
+  giftViewOwner = (ctx && ctx.owner) || null;
   let g = giftEntry || data;
 
   // If opened from chat bubble (no giftEntry), try to find the full NFT object
@@ -7754,6 +7770,17 @@ function openGiftView(msgId, giftEntry, ctx) {
   document.getElementById('gvmModelRow').style.display = isNft && g.nftModelName ? '' : 'none';
   document.getElementById('gvmBgRow').style.display = isNft && g.nftGradientName ? '' : 'none';
   document.getElementById('gvmModel').textContent = g.nftModelName || '';
+  const ownerRow = document.getElementById('gvmOwnerRow'), ownerEl = document.getElementById('gvmOwner');
+  ownerRow.style.display = giftViewOwner ? '' : 'none';
+  ownerEl.innerHTML = '';
+  if (giftViewOwner) {
+    const o = giftViewOwner;
+    const ln = document.createElement('span');
+    ln.className = 'mention-link';
+    ln.textContent = (o.id === myUser?.id ? 'Вы' : o.name) + (o.username ? ' (@' + String(o.username).replace(/^@/, '') + ')' : '');
+    ln.onclick = openNftOwner;
+    ownerEl.appendChild(ln);
+  }
   const bgEl = document.getElementById('gvmBg');
   bgEl.innerHTML = '';
   if (isNft && g.nftGradientName) {
@@ -9095,8 +9122,11 @@ function linkifyText(text) {
     .replace(/&/g,'&amp;')
     .replace(/</g,'&lt;')
     .replace(/>/g,'&gt;');
+  // Внутренние ссылки на NFT: nethgram/nft/scaredcat44 → открывают карточку подарка
+  const withNft = escaped.replace(/(?:https?:\/\/)?(?:www\.)?nethgram(?:\.[a-z]{2,10})?\/nft\/([A-Za-z0-9_-]{2,64})/gi, (match, slug) =>
+    '<span class="mention-link nft-link" onclick="event.stopPropagation();openNftLink(\'' + slug.replace(/[^A-Za-z0-9]/g,'') + '\')">' + match + '</span>');
   // Replace @username with clickable links
-  const linked = escaped.replace(/@([\w\u0400-\u04FF\u0410-\u044F._-]+)/g, (match, uname) => {
+  const linked = withNft.replace(/@([\w\u0400-\u04FF\u0410-\u044F._-]+)/g, (match, uname) => {
     // Search in regular usernames
     for (const [id, c] of contacts) {
       if (c.username && c.username.replace(/^@/,'').toLowerCase() === uname.toLowerCase()) {
@@ -9121,6 +9151,28 @@ function linkifyText(text) {
     return '<span class="mention-link" style="opacity:.7">'+match+'</span>';
   });
   return linked.replace(/\[\[e:(\d+_\d+)\]\]/g, '<img class="inline-emoji" src="/assets/emoji_$1.png" alt="">');
+}
+
+// ── ССЫЛКИ НА NFT ──
+let pendingNftLink = null;
+function openNftLink(slug) {
+  if (!slug) return;
+  pendingNftLink = slug;
+  wsSend({ type: 'nft_lookup', tag: slug });
+}
+function handleNftLookupResult(m) {
+  if (!pendingNftLink || String(m.tag) !== pendingNftLink) return;
+  pendingNftLink = null;
+  if (!m.ok || !m.nft) { showToast('Nethgram', 'NFT-подарок не найден', 'logo', '#e74c3c'); return; }
+  openGiftView(null, { ...m.nft, isNft: true }, { owner: m.owner });
+}
+function openNftOwner() {
+  const o = giftViewOwner; if (!o) return;
+  if (o.isChannel) {
+    if (contacts.has(o.id)) { closeGiftView(); openChat(o.id); }
+    return;
+  }
+  if (o.id === myUser?.id || contacts.has(o.id)) { closeGiftView(); openMentionProfile(o.id); }
 }
 
 function openMentionProfile(userId) {
@@ -9863,6 +9915,37 @@ function processPayment() {
   }, 1800);
 }
 
+// ── Автоподпись подарков (хранится локально для каждого аккаунта) ──
+function autoSignKey() { return 'ng_autosign_' + ((myUser && myUser.id) || 'anon'); }
+function getAutoSign() {
+  try { const d = JSON.parse(localStorage.getItem(autoSignKey()) || 'null'); if (d && typeof d === 'object') return { on: !!d.on, text: String(d.text || '') }; } catch(e) {}
+  return { on: false, text: '' };
+}
+function setAutoSign(d) { try { localStorage.setItem(autoSignKey(), JSON.stringify(d)); } catch(e) {} }
+// Подпись, которую надо подставить в подарок (пустая строка — не подписывать)
+function autoSignText() { const d = getAutoSign(); return d.on ? d.text.trim().slice(0, 255) : ''; }
+function renderAutoSign() {
+  const d = getAutoSign();
+  const t = document.getElementById('autoSignTgl'), i = document.getElementById('autoSignInput');
+  if (t) t.classList.toggle('on', d.on);
+  if (i) { if (document.activeElement !== i) i.value = d.text; i.disabled = !d.on; }
+}
+function togglePrivacyPanel() {
+  const p = document.getElementById('stPrivPanel'), c = document.getElementById('stPrivChev');
+  const open = !p.classList.contains('open');
+  p.classList.toggle('open', open); if (c) c.classList.toggle('open', open);
+  if (open) renderAutoSign();
+}
+function toggleAutoSign() {
+  const d = getAutoSign(); d.on = !d.on; setAutoSign(d); renderAutoSign();
+  if (d.on) { const i = document.getElementById('autoSignInput'); if (i) i.focus(); }
+  showToast('Nethgram', d.on ? '✍️ Автоподпись подарков включена' : 'Автоподпись подарков выключена', 'logo');
+}
+function saveAutoSign() {
+  const i = document.getElementById('autoSignInput'); if (!i) return;
+  const d = getAutoSign(); d.text = i.value.slice(0, 255); setAutoSign(d);
+}
+
 function openSettings() {
   try {
     const av=document.getElementById('stAva');
@@ -9873,6 +9956,7 @@ function openSettings() {
     document.getElementById('stUser').textContent=myUsername?'@'+myUsername:'';
     document.getElementById('stStarsVal').textContent=(typeof isStarsUnlimited!=='undefined'&&isStarsUnlimited)?'∞':starBalance.toLocaleString();
     document.getElementById('stMore').classList.remove('open');
+    renderAutoSign();
   } catch(e) {}
   // Restore saved settings
   try {
@@ -10309,6 +10393,7 @@ function closeContactProfile() {
         <div class="gvm-trow"><div class="gvm-tl">Дата</div><div class="gvm-tv" id="gvmDate"></div></div>
         <div class="gvm-trow"><div class="gvm-tl">Стоимость</div><div class="gvm-tv"><span class="gvm-price" id="gvmPrice"></span><button class="gvm-sell" id="gvmSellBtn" style="display:none" onclick="sellGiftForStars()"></button></div></div>
         <div class="gvm-trow" id="gvmModelRow" style="display:none"><div class="gvm-tl">Модель</div><div class="gvm-tv" id="gvmModel"></div></div>
+        <div class="gvm-trow" id="gvmOwnerRow" style="display:none"><div class="gvm-tl">Владелец</div><div class="gvm-tv" id="gvmOwner"></div></div>
         <div class="gvm-trow" id="gvmBgRow" style="display:none"><div class="gvm-tl">Фон</div><div class="gvm-tv" id="gvmBg"></div></div>
       </div>
       <div class="gvm-hint" id="gvmHintHidden" style="display:none">Этот подарок скрыт. Видите его только вы.</div>
@@ -10681,7 +10766,12 @@ function closeContactProfile() {
       <div class="st-group">
         <div class="st-row" onclick="closeSettings();openProfile()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3.2"/><path d="M5.8 18.5a7.5 7.5 0 0 1 12.4 0"/></svg></span><span class="st-label">Мой аккаунт</span></div>
         <div class="st-row" onclick="showToast('Nethgram','Раздел скоро появится','logo')"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span><span class="st-label">Уведомления и звуки</span></div>
-        <div class="st-row" onclick="showToast('Nethgram','Раздел скоро появится','logo')"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><span class="st-label">Конфиденциальность</span></div>
+        <div class="st-row" onclick="togglePrivacyPanel()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><span class="st-label">Конфиденциальность</span><span class="st-chev" id="stPrivChev">›</span></div>
+        <div class="st-priv" id="stPrivPanel">
+          <div class="st-row nohover" onclick="toggleAutoSign()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><span class="st-label" style="white-space:normal">Автоматически подписывать все мои подарки</span><span class="st-tgl" id="autoSignTgl"></span></div>
+          <div class="st-priv-hint">Каждый подарок, который вы отправите себе, другим пользователям или каналам, будет подписан этим текстом, если вы не напишете своё сообщение.</div>
+          <div class="st-priv-input"><input type="text" id="autoSignInput" maxlength="255" placeholder="Текст подписи…" oninput="saveAutoSign()"></div>
+        </div>
         <div class="st-row" onclick="document.getElementById('stChatBg').scrollIntoView({behavior:'smooth'})"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-12.4 7.5L3 21l1.5-5.1A8.5 8.5 0 1 1 21 12z"/></svg></span><span class="st-label">Настройки чатов</span></div>
         <div class="st-row" onclick="showToast('Nethgram','Раздел скоро появится','logo')"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="st-label">Папки</span></div>
         <div class="st-row" onclick="document.getElementById('darkToggle').click()"><span class="st-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span><span class="st-label">Тёмная тема</span><label class="st-switch"><input type="checkbox" id="darkToggle" onchange="toggleDarkTheme(this.checked)" style="opacity:0;width:0;height:0"><span id="darkToggleTrack" style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:24px;transition:.3s"></span><span id="darkToggleThumb" style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,.2)"></span></label></div>

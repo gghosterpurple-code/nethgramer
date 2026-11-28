@@ -3343,6 +3343,38 @@ server.on('upgrade', (req, socket) => {
         break;
       }
 
+      // Внутренняя ссылка nethgram/nft/<тег>: найти NFT по тегу и вернуть его данные и владельца
+      case 'nft_lookup': {
+        if (!userId) break;
+        const slug = String(msg.tag || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 64);
+        const tagOf = g => String(g.nftTag || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        let found = null, owner = null;
+        if (slug) {
+          for (const [uid, list] of userGifts) {
+            const g = (list || []).find(x => x && x.isNft && tagOf(x) === slug);
+            if (g) {
+              const u = users.get(uid);
+              found = g; owner = { id: uid, name: u ? u.name : 'Пользователь', username: u && u.username ? u.username : null, isChannel: false };
+              break;
+            }
+          }
+          if (!found) for (const [cid, list] of channelGifts) {
+            const g = (list || []).find(x => x && x.isNft && tagOf(x) === slug);
+            if (g) {
+              const c = channels.get(cid);
+              found = g; owner = { id: cid, name: c ? c.name : 'Канал', username: c && c.username ? c.username : null, isChannel: true };
+              break;
+            }
+          }
+        }
+        if (!found) { send({ type:'nft_lookup_result', tag: msg.tag, ok:false }); break; }
+        const { fromId, fromName, msg: caption, ...pub } = found;
+        // имя отправителя видно только владельцу
+        const nft = owner.id === userId ? found : { ...pub, msg: caption || '' };
+        send({ type:'nft_lookup_result', tag: msg.tag, ok:true, nft, owner });
+        break;
+      }
+
       case 'toggle_gift_hidden': {
         if (!userId) break;
         if (msg.channelId) {
